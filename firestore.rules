@@ -1,0 +1,37 @@
+rules_version = '2';
+// Regras do banco do app Amostras PA.
+// IMPORTANTE: o e-mail abaixo deve ser o mesmo de OWNER_EMAIL no config.js.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signed()  { return request.auth != null && request.auth.token.email_verified == true; }
+    function em()      { return request.auth.token.email.lower(); }
+    function owner()   { return signed() && em() == 'gskmilena@gmail.com'; }
+    function role() {
+      let p = /databases/$(database)/documents/niveis/$(em());
+      return exists(p) ? get(p).data.nivel : 'pendente';
+    }
+    function full() { return owner() || (signed() && role() == 'total'); }
+    function op()   { return full()  || (signed() && role() == 'operador'); }
+    function view() { return op()    || (signed() && role() == 'leitura'); }
+
+    // Nível de cada pessoa: só a proprietária define; cada um lê o próprio.
+    match /niveis/{e} {
+      allow read: if owner() || (signed() && em() == e);
+      allow write: if owner();
+    }
+    match /config/{d}   { allow read: if view(); allow write: if full(); }
+    match /amostras/{id} { allow read: if view(); allow create, update: if op(); allow delete: if full(); }
+    match /movs/{id}     { allow read: if view(); allow create, update: if op(); allow delete: if full(); }
+    match /clientes/{id} { allow read: if view(); allow write: if full(); }
+    match /legado/{id}   { allow read: if view(); allow write: if full(); }
+    match /pessoas/{e} {
+      allow read: if view() || (signed() && em() == e);
+      allow write: if owner() || (request.auth != null && request.auth.token.email.lower() == e);
+    }
+    match /log/{e}/meses/{m} {
+      allow read: if full() || (signed() && em() == e);
+      allow write: if owner() || (signed() && em() == e);
+    }
+  }
+}

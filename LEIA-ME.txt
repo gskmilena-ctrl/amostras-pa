@@ -1,0 +1,12 @@
+Amostras PA — app próprio (Firebase + GitHub Pages)
+
+Arquivos:
+  index.html            o app
+  config.js             ÚNICO arquivo a editar: cole o firebaseConfig e confira o e-mail da proprietária
+  firestore.rules       regras de segurança: copie e cole no Firebase (Firestore Database > Regras)
+  manifest.webmanifest  faz o Chrome oferecer "Instalar app" / "Abrir no app"
+  sw.js                 service worker (abre rápido e funciona como app instalado)
+  icones/               ícone do pote de acerola
+
+Se trocar o e-mail da proprietária, troque nos DOIS lugares: config.js e firestore.rules.
+Para atualizar o app no futuro, basta substituir o index.html no GitHub.
