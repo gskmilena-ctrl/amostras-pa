@@ -106,7 +106,8 @@
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
-.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1320px;margin:0 auto;width:100%}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:none;margin:0 auto;width:100%}
+@media (min-width:860px){.wrap{padding-left:24px;padding-right:24px}}
 .shell{min-height:100%}
 .rail{display:none}
 .content{min-width:0;display:flex;flex-direction:column}
@@ -176,20 +177,26 @@ textarea{resize:vertical;min-height:60px}
 .tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;font-weight:600;background:var(--sunk);padding:8px 10px;white-space:nowrap;position:sticky;top:0}
-td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:middle}
+td{padding:8px 8px;border-top:1px solid var(--line);vertical-align:middle}
 td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 td.mono{font-family:var(--mono);font-size:12px;white-space:nowrap}
 td.nowrap{white-space:nowrap}
+.c-alt{display:none}
+@media (max-width:1599px){.c-opt{display:none}.c-alt{display:block}}
+@media (max-width:1399px){.c-opt2{display:none}}
 tr.row:hover td{background:var(--sunk)}
 .prod{font-weight:600}
 td .prod,td.prod{min-width:150px}
+@media (min-width:1500px){td .prod,td.prod{min-width:230px}}
 .sub{color:var(--muted);font-size:12px}
 .pill{display:inline-flex;align-items:center;gap:5px;font:600 11px var(--body);text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:999px;white-space:nowrap;background:var(--pbg);color:var(--pfg)}
 .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .st-ok{--pbg:var(--ok-soft);--pfg:var(--ok)} .st-avencer{--pbg:var(--warn-soft);--pfg:var(--warn)} .st-vencida{--pbg:var(--bad-soft);--pfg:var(--bad)}
 .st-esgotada,.st-descartada,.st-semval{--pbg:var(--idle-soft);--pfg:var(--idle)} .st-aguard{--pbg:var(--warn-soft);--pfg:var(--warn)}
 .mv-entrada{color:var(--ok)} .mv-saida{color:var(--accent)} .mv-descarte{color:var(--bad)} .mv-ajuste{color:var(--warn)} .mv-reclass_out,.mv-reclass_in{color:var(--accent)}
-.rowacts{display:flex;gap:4px;justify-content:flex-end;flex-wrap:nowrap}
+.rowacts{display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;max-width:190px;margin-left:auto}
+.rowacts .btn.sm{padding:0 9px}
+td>.rowacts{min-width:172px}
 .empty{padding:32px 16px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
 .empty strong{color:var(--ink);font-size:15px}
 .chart svg{width:100%;height:auto;display:block}
@@ -1095,14 +1102,14 @@ function dataEstoque(){
   const resumo=`<div class="sub">${R.length} lote${R.length===1?"":"s"} · ${nf(R.reduce((s,r)=>s+Math.max(r.saldo,0),0))} unidades · ${fkg(R.reduce((s,r)=>s+(r.saldo>0&&!r.descartada?kgOf(r):0),0))} kg</div>`;
   if(isMobile()){ const lim=MOBLIM.estoque; return resumo+`<div class="mlist">${R.slice(0,lim).map(r=>cardAmostra(r,ro)).join("")}</div>${R.length>lim?`<button class="btn" style="width:100%" data-act="mais" data-k="estoque">Mostrar mais (${R.length-lim} restantes)</button>`:""}`; }
   return resumo+`
-  <div class="tablebox"><table><thead><tr><th>Produto</th><th>Lote</th><th>Tipo</th><th>Fabricação</th><th>Validade</th><th class="num">Dias</th><th>Situação</th><th class="num">Saldo</th><th class="num">Peso (kg)</th><th>Localização</th><th>Atualização</th><th></th></tr></thead><tbody>
+  <div class="tablebox"><table><thead><tr><th>Produto</th><th>Lote</th><th class="c-opt">Tipo</th><th class="c-opt">Fabricação</th><th>Validade</th><th class="num">Dias</th><th>Situação</th><th class="num">Saldo</th><th class="num">Peso (kg)</th><th>Localização</th><th class="c-opt2">Atualização</th><th></th></tr></thead><tbody>
   ${R.map(r=>`<tr class="row">
     <td><div class="prod">${esc(r.produto)}</div><div class="sub">${[r.mapa?"MAPA "+r.mapa:"",r.codigo,r.conteudo].filter(Boolean).map(esc).join(" · ")}</div></td>
-    <td class="mono">${esc(r.lote)}</td><td class="nowrap">${esc(r.tipo||"—")}</td>
-    <td class="mono">${fmtD(r.fabricacao)}</td><td class="mono">${fmtD(r.validade)}</td>
+    <td class="mono">${esc(r.lote)}${r.tipo?`<div class="sub c-alt" style="font-family:var(--body)">${esc(r.tipo)}</div>`:""}</td><td class="nowrap c-opt">${esc(r.tipo||"—")}</td>
+    <td class="mono c-opt">${fmtD(r.fabricacao)}</td><td class="mono">${fmtD(r.validade)}<div class="sub c-alt">fab. ${fmtD(r.fabricacao)}</div></td>
     <td class="num" style="color:${r.st==="vencida"?"var(--bad)":r.st==="avencer"?"var(--warn)":"inherit"}">${r.dias==null||r.descartada||r.saldo<=0?"—":r.dias}</td>
     <td>${pill(r.st)}</td><td class="num"><b>${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")}</span>${r.pendIn||r.pendOut?`<div class="sub" style="color:var(--warn)">⏳ ${[r.pendIn?"+"+nf(r.pendIn):"",r.pendOut?"−"+nf(r.pendOut):""].filter(Boolean).join(" / ")}</div>`:""}</td><td class="num">${(k=>k?fkg(k):"—")(r.saldo>0&&!r.descartada?kgOf(r):0)}</td>
-    <td class="nowrap">${esc(r.local||"—")}</td><td><div class="mono">${fmtD(r.atual)}</div><div class="sub">${esc(r.respUlt)}</div></td>
+    <td class="nowrap">${esc(r.local||"—")}</td><td class="c-opt2"><div class="mono">${fmtD(r.atual)}</div><div class="sub">${esc(r.respUlt)}</div></td>
     <td><div class="rowacts">
       ${!ro&&r.saldo>0&&!r.descartada?`<button class="btn sm" data-act="retirar" data-id="${r.id}" title="Registrar retirada">Retirar</button>`:""}
       ${!ro&&!r.descartada?`<button class="btn sm" data-act="entrada" data-id="${r.id}" title="Adicionar unidades">+ Entrada</button>`:""}
