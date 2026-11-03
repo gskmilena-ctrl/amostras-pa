@@ -234,6 +234,13 @@ td>.rowacts{min-width:172px}
 @media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.modal .body{grid-template-columns:minmax(0,1fr)}.avg{grid-template-columns:repeat(2,minmax(0,1fr))}h1{font-size:19px}.actions .btn .lbl{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ---------- Local de armazenamento ---------- */
+.linkbtn{background:none;border:0;padding:2px 0;color:inherit;font:inherit;cursor:pointer;text-align:left;text-decoration:underline dotted;text-decoration-color:var(--dim);text-underline-offset:3px}
+.linkbtn:hover{color:var(--accent)}
+.lchkbox{max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
+.lchk{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line);cursor:pointer;font-size:13.5px}
+.lchk:first-child{border-top:0}
+.lchk input{width:18px;height:18px;min-height:0;flex:0 0 auto;accent-color:var(--accent)}
 /* ---------- Aparência ---------- */
 .skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .skinopt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);font:600 13.5px var(--body);cursor:pointer;text-align:left;min-height:48px}
@@ -570,7 +577,8 @@ const DEFAULT_CFG = {
   destinos: ["Indústria","Agrícola","Externo"],
   tipos: ["Retenção (contraprova)","Análise","Estabilidade","Cliente / comercial","Reclamação"],
   motivos: ["Análise de rotina","Análise de reclamação","Análise externa (laboratório)","Envio a cliente","Estudo de estabilidade","Auditoria / fiscalização","Descarte – vencida","Descarte – avariada","Outro"],
-  unidades: ["un","fr","cx","pct","kg","g","L","mL"]
+  unidades: ["un","fr","cx","pct","kg","g","L","mL"],
+  motivosReclass: ["Solicitação do cliente","Acordo comercial","Perda de certificação orgânica","Outro"]
 };
 const S = { role:"total", isOwner:false, myId:null, canW:null, acessos:{}, pessoas:[], amostras:[], movs:[], hist:[], clientes:[], envh:[], envIds:{}, stkIds:{}, stkKg:{}, envKg:{}, fc:{q:"",pais:"",tipo:""}, cfg:{...DEFAULT_CFG}, mode:"loading", tab:"painel", readonly:false,
   f:{ q:"", status:"ativas", local:"", tipo:"", sort:"validade" },
@@ -762,6 +770,49 @@ function refresh(force){
 document.addEventListener("focusout",()=>{ setTimeout(()=>{ if(pendingRefresh) refresh(); },0); });
 
 
+
+
+/* ======================= Local de armazenamento ======================= */
+const LOCAIS=()=>[...new Set([...(S.cfg.locais||[]),...S.amostras.map(a=>a.local).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"pt"));
+function mudarLocal(ids){
+  if(S.readonly){ toast("Seu acesso é só de visualização."); return; }
+  const R=rows().filter(r=>!r.descartada&&(r.saldo>0||r.pendIn>0||r.st==="aguard"));
+  const single=ids&&ids.length===1; const r0=single?rows().find(x=>x.id===ids[0]):null; if(single&&!r0) return;
+  const locs=LOCAIS(); const de0=single?(r0.local||""):(S.f.local||locs[0]||"");
+  const lista=de=>R.filter(r=>(r.local||"")===de).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(a.lote).localeCompare(String(b.lote)));
+  const chk=de=>{ const L=lista(de); return L.length?`<label class="lchk" style="background:var(--surface)"><input type="checkbox" id="ml_all" checked><b>Marcar todos (${L.length})</b></label>`+L.map(r=>`<label class="lchk"><input type="checkbox" class="ml_it" value="${r.id}" checked><span style="min-width:0"><b>${esc(r.produto)}</b><br><span class="sub">Lote <span class="mono">${esc(r.lote)}</span> · ${nf(r.saldo)} ${esc(r.unidade||"un")}${r.st==="vencida"?" · vencida":""}</span></span></label>`).join(""):`<div class="lchk muted">Nenhum lote em estoque neste local.</div>`; };
+  const body=`${single?`<div class="ref full"><div><div class="prod">${esc(r0.produto)}</div><div class="sub">Lote <span class="lote">${esc(r0.lote)}</span> · ${nf(r0.saldo)} ${esc(r0.unidade||"un")}</div></div><div><div class="sub">Local atual</div><b>${esc(r0.local||"sem local")}</b></div></div>`
+      :`<div class="field full"><label for="ml_de">Lotes que estão em</label><select id="ml_de">${locs.map(l=>`<option${l===de0?" selected":""}>${esc(l)}</option>`).join("")}<option value="">(sem local definido)</option></select></div>
+        <div class="full"><div class="lchkbox" id="ml_list">${chk(de0)}</div></div>`}
+    <div class="field full"><label for="ml_para">Novo local *</label><input id="ml_para" list="ml_dl" placeholder="Escolha ou digite um local novo" autocomplete="off"><datalist id="ml_dl">${locs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist></div>
+    <div class="field"><label for="ml_data">Data *</label><input id="ml_data" type="date" value="${hoje()}"></div>
+    <div class="field"><label for="ml_resp">Responsável *</label><select id="ml_resp">${opts(S.cfg.analistas,lastResp(),"Selecione")}</select></div>
+    <div class="field full"><label for="ml_obs">Motivo / observação</label><input id="ml_obs" placeholder="ex.: manutenção do container, reorganização da câmara"></div>
+    <div class="formerr full" id="ml_err"></div>`;
+  const m=modal(single?"Mudar local de armazenamento":"Mudar local de vários lotes",body,`<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">Mudar local</button>`);
+  const q=x=>m.ov.querySelector(x);
+  const deSel=q("#ml_de"); if(deSel) deSel.onchange=()=>{ q("#ml_list").innerHTML=chk(deSel.value); };
+  m.ov.addEventListener("change",e=>{ if(e.target.id==="ml_all") m.ov.querySelectorAll(".ml_it").forEach(c=>c.checked=e.target.checked); });
+  m.form.onsubmit=async e=>{ e.preventDefault(); const err=q("#ml_err");
+    const para=q("#ml_para").value.trim(), data=q("#ml_data").value, resp=q("#ml_resp").value, obs=q("#ml_obs").value.trim();
+    const alvo=single?[r0.id]:[...m.ov.querySelectorAll(".ml_it:checked")].map(c=>c.value);
+    if(!alvo.length){ err.textContent="Marque pelo menos um lote."; return; }
+    if(!para){ err.textContent="Informe o novo local."; return; }
+    if(!data){ err.textContent="Informe a data."; return; }
+    if(!resp){ err.textContent="Selecione o responsável. Se o nome não está na lista, cadastre em Cadastros → Analistas."; return; }
+    const de=single?(r0.local||""):(deSel?deSel.value:"");
+    if(norm(para)===norm(de)){ err.textContent="O novo local é igual ao atual."; return; }
+    LS.set("resp",resp); m.close();
+    const nomeLocal=locs.find(l=>norm(l)===norm(para))||para;
+    let n=0;
+    const ok=await guard(async()=>{ for(const id of alvo){ const a=S.amostras.find(x=>x.id===id); if(!a) continue;
+        const h={de:a.local||"",para:nomeLocal,data,resp,por:S.myId||"",obs,em:new Date().toISOString()};
+        await store.updateAmostra(id,{local:nomeLocal,atualizadoEm:data,locaisHist:[...(a.locaisHist||[]),h].slice(-50)}); n++; } });
+    if(ok){ toast(`${n} lote${n===1?"":"s"} ${n===1?"movido":"movidos"} para ${nomeLocal}`);
+      if(FULL()&&!(S.cfg.locais||[]).some(l=>norm(l)===norm(nomeLocal))) await guard(()=>store.saveCfg({...S.cfg,locais:[...(S.cfg.locais||[]),nomeLocal].sort((a,b)=>a.localeCompare(b,"pt"))}));
+      if(S.f.local&&!single){ S.f.local=nomeLocal; } render(); }
+  };
+}
 
 /* ======================= Confirmação das movimentações ======================= */
 const CONF_LABEL={todos:"Todas as entradas, retiradas e descartes (confirmação por outra pessoa com acesso total)",operador:"Só os lançamentos de quem tem “Inclusão e saída”"};
@@ -969,7 +1020,7 @@ function cardAmostra(r,ro){
   const kg=r.saldo>0&&!r.descartada?kgOf(r):0;
   return `<div class="mcard" style="--c:${ST_COLOR[r.st]||"var(--accent)"}">
     <div class="mrow"><div><div class="mtitle">${esc(r.produto)}</div><div class="mmeta">Lote <span class="mono">${esc(r.lote)}</span>${r.tipo?" · "+esc(r.tipo):""}</div></div>${pill(r.st)}</div>
-    <div class="mrow"><div class="mmeta">Validade <span class="mono">${fmtD(r.validade)}</span>${diasTxt(r)?` · <b style="color:${ST_COLOR[r.st]}">${diasTxt(r)}</b>`:""}<br>${esc(r.local||"sem local")}</div>
+    <div class="mrow"><div class="mmeta">Validade <span class="mono">${fmtD(r.validade)}</span>${diasTxt(r)?` · <b style="color:${ST_COLOR[r.st]}">${diasTxt(r)}</b>`:""}<br>${!ro&&!r.descartada?`<button type="button" class="linkbtn" data-act="local" data-id="${r.id}">📍 ${esc(r.local||"definir local")} ✎</button>`:"📍 "+esc(r.local||"sem local")}</div>
       <div style="text-align:right"><div class="mbig">${nf(r.saldo)} <span class="mmeta">${esc(r.unidade||"un")}</span></div><div class="mmeta">${kg?fkg(kg)+" kg":""}</div></div></div>
     ${r.pendIn||r.pendOut?`<div class="mmeta" style="color:var(--warn)">⏳ ${[r.pendIn?"+"+nf(r.pendIn):"",r.pendOut?"−"+nf(r.pendOut):""].filter(Boolean).join(" / ")} aguardando confirmação</div>`:""}
     <div class="macts">
@@ -1074,6 +1125,7 @@ function shellEstoque(){
       ${[["ativas","Em estoque"],["ok","Ok"],["avencer","A vencer"],["vencida","Vencidas"],["esgotada","Esgotadas"],["descartada","Descartadas"],["todas","Todas"]].map(([v,l])=>`<option value="${v}"${f.status===v?" selected":""}>${l}</option>`).join("")}</select></div>
     <div class="field dsk"><label for="floc">Localização</label><select id="floc">${opts(locais,f.local,"Todas")}</select></div>
     <div class="field dsk"><label for="ftp">Tipo</label><select id="ftp">${opts(S.cfg.tipos,f.tipo,"Todos")}</select></div>
+    ${S.readonly?"":`<button type="button" class="btn" data-act="mudarlocais" title="Mudar o local de vários lotes de uma vez">📍 Mudar local de lotes</button>`}
     <div class="field"><label for="fso">Ordenar por</label><select id="fso">
       ${[["validade","Validade (mais próxima)"],["produto","Produto (A–Z)"],["fabricacao","Fabricação (recente)"],["saldo","Saldo (maior)"]].map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select></div>
   </div><div id="data"></div>`;
@@ -1109,7 +1161,7 @@ function dataEstoque(){
     <td class="mono c-opt">${fmtD(r.fabricacao)}</td><td class="mono">${fmtD(r.validade)}<div class="sub c-alt">fab. ${fmtD(r.fabricacao)}</div></td>
     <td class="num" style="color:${r.st==="vencida"?"var(--bad)":r.st==="avencer"?"var(--warn)":"inherit"}">${r.dias==null||r.descartada||r.saldo<=0?"—":r.dias}</td>
     <td>${pill(r.st)}</td><td class="num"><b>${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")}</span>${r.pendIn||r.pendOut?`<div class="sub" style="color:var(--warn)">⏳ ${[r.pendIn?"+"+nf(r.pendIn):"",r.pendOut?"−"+nf(r.pendOut):""].filter(Boolean).join(" / ")}</div>`:""}</td><td class="num">${(k=>k?fkg(k):"—")(r.saldo>0&&!r.descartada?kgOf(r):0)}</td>
-    <td class="nowrap">${esc(r.local||"—")}</td><td class="c-opt2"><div class="mono">${fmtD(r.atual)}</div><div class="sub">${esc(r.respUlt)}</div></td>
+    <td class="nowrap">${!ro&&!r.descartada?`<button type="button" class="linkbtn" data-act="local" data-id="${r.id}" title="Mudar local de armazenamento">${esc(r.local||"definir local")} <span aria-hidden="true">✎</span></button>`:esc(r.local||"—")}</td><td class="c-opt2"><div class="mono">${fmtD(r.atual)}</div><div class="sub">${esc(r.respUlt)}</div></td>
     <td><div class="rowacts">
       ${!ro&&r.saldo>0&&!r.descartada?`<button class="btn sm" data-act="retirar" data-id="${r.id}" title="Registrar retirada">Retirar</button>`:""}
       ${!ro&&!r.descartada?`<button class="btn sm" data-act="entrada" data-id="${r.id}" title="Adicionar unidades">+ Entrada</button>`:""}
@@ -1316,7 +1368,7 @@ async function saveAcesso(uid,role){
 
 /* ---------- Cadastros ---------- */
 function shellCadastros(){ return `<div id="data"></div>`; }
-const LISTS = [["analistas","Analistas / responsáveis","Quem cadastra, retira ou descarta."],["locais","Localizações","Onde as amostras ficam guardadas."],["tipos","Tipos de amostra",""],["motivos","Motivos de retirada",""],["destinos","Destinos",""],["unidades","Unidades",""]];
+const LISTS = [["analistas","Analistas / responsáveis","Quem cadastra, retira ou descarta."],["locais","Localizações","Onde as amostras ficam guardadas."],["tipos","Tipos de amostra",""],["motivos","Motivos de retirada",""],["destinos","Destinos",""],["unidades","Unidades",""],["motivosReclass","Motivos de reclassificação","Aparecem ao reclassificar um lote (ex.: orgânico → convencional)."]];
 function dataCadastros(){
   const ro=S.readonly||!FULL();
   if(FULL()&&S.mode==="db") setTimeout(resolveAccNames,0);
@@ -1371,6 +1423,8 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="backup") backupJSON(b);
   else if(act==="instalar") instalarApp();
   else if(act==="evid") evidDetalhe(id);
+  else if(act==="local") mudarLocal([id]);
+  else if(act==="mudarlocais") mudarLocal(null);
   else if(act==="skin"){ applySkin(b.dataset.v); refresh(true); toast("Tema: "+SKIN_INFO[b.dataset.v][0]); }
   else if(act==="confmov") confirmarMov(id);
   else if(act==="recmov") recusarMov(id);
@@ -1604,7 +1658,7 @@ function reclassificar(id){
    <div class="field"><label for="rc_qtd">Quantidade *</label><input id="rc_qtd" type="number" min="1" step="1" value="${io.ids.length?"":r.saldo}"></div>
    <div class="field"><label for="rc_kg">Peso (kg)</label><input id="rc_kg" inputmode="decimal" placeholder="calculado pelos IDs" style="font-family:var(--mono)"></div>
    <div class="field"><label for="rc_data">Data *</label><input id="rc_data" type="date" value="${hoje()}"></div>
-   <div class="field"><label for="rc_mot">Motivo *</label><select id="rc_mot">${opts(["Solicitação do cliente","Acordo comercial","Perda de certificação orgânica","Outro"])}</select></div>
+   <div class="field"><label for="rc_mot">Motivo *</label><select id="rc_mot">${opts((S.cfg.motivosReclass&&S.cfg.motivosReclass.length)?S.cfg.motivosReclass:["Outro"])}</select></div>
    <div class="field full"><label for="rc_cli">Cliente / acordo (opcional)</label><select id="rc_cli"><option value="">—</option>${S.clientes.filter(c=>(c.tipo||"Cliente")==="Cliente").sort((a,b)=>a.nome.localeCompare(b.nome,"pt")).map(c=>`<option value="${c.id}">${esc(c.nome)}${c.pais?" · "+esc(c.pais):""}</option>`).join("")}</select></div>
    <div class="field full"><label for="rc_resp">Responsável *</label><select id="rc_resp">${opts(S.cfg.analistas,lastResp(),"Selecione")}</select></div>
    <div class="field full"><label for="rc_obs">Observação</label><input id="rc_obs" placeholder="ex.: nº do pedido, e-mail de autorização"></div>
@@ -1747,11 +1801,13 @@ function historico(id){
   const body=`<div class="ref full"><div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span></div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")}</span></div></div>
    <div class="full"><div class="sub" style="margin-bottom:4px">IDs em estoque (${io.ids.length})${io.ids.length?` · peso ${fkg(kgOf(r))} kg`:""}${io.conf?` · <span style="color:var(--warn)">conferir: ${esc(io.conf)}</span>`:""}</div>${io.ids.length?`<div class="chips">${io.ids.map(i=>`<span class="chip" style="padding:3px 10px;font-family:var(--mono)">${esc(idLabel(i,io.q,io.kg))}</span>`).join("")}</div>`:`<span class="sub">Nenhum ID registrado.</span>`}</div>
    <div class="full" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">${info.map(([k,v])=>`<div><div class="sub">${k}</div><div>${esc(v)}</div></div>`).join("")}</div>
+   ${(r.locaisHist||[]).length?`<div class="full"><div class="sub" style="margin-bottom:4px">Mudanças de local</div><div class="tablebox"><table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Responsável</th><th>Obs.</th></tr></thead><tbody>${r.locaisHist.slice().reverse().map(h=>`<tr><td class="mono">${fmtD(h.data)}</td><td>${esc(h.de||"—")}</td><td><b>${esc(h.para)}</b></td><td>${esc(h.resp||h.por||"")}</td><td class="sub">${esc(h.obs||"")}</td></tr>`).join("")}</tbody></table></div></div>`:""}
    <div class="full tablebox"><table><thead><tr><th>Data</th><th>Tipo</th><th class="num">Qtd</th><th>Motivo</th><th>Destino</th><th>Responsável</th><th>Obs.</th></tr></thead><tbody>
    ${M.map(m=>`<tr><td class="mono">${fmtD(m.data)}</td><td class="mv-${m.tipo}"><b>${MV_LABEL[m.tipo]||esc(m.tipo)}</b></td><td class="num">${Number(m.qtd)===0?"":((m.tipo==="entrada"||m.tipo==="reclass_in"||(m.tipo==="ajuste"&&m.qtd>0))?"+":"−")}${nf(Math.abs(m.qtd))}</td><td>${esc(m.motivo)}</td><td>${esc(m.destino)}</td><td>${esc(m.responsavel)}</td><td class="sub">${esc(m.obs)}${m.ids?` · ID ${esc(m.ids)}`:""}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">Sem movimentações.</td></tr>`}
    </tbody></table></div>`;
   const ro=S.readonly;
-  const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
+  const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&!r.descartada?`<button type="button" class="btn" id="h_lc">Mudar local</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
+  const lc=m.ov.querySelector("#h_lc"); if(lc) lc.onclick=()=>{ m.close(); mudarLocal([id]); };
   const ed=m.ov.querySelector("#h_ed"); if(ed) ed.onclick=()=>{ m.close(); formAmostra(S.amostras.find(x=>x.id===id)); };
   const rt=m.ov.querySelector("#h_rt"); if(rt) rt.onclick=()=>{ m.close(); formMov(id,"saida"); };
   const aj=m.ov.querySelector("#h_aj"); if(aj) aj.onclick=()=>{ m.close(); ajustarLote(id); };
