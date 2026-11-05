@@ -234,6 +234,11 @@ td>.rowacts{min-width:172px}
 @media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.modal .body{grid-template-columns:minmax(0,1fr)}.avg{grid-template-columns:repeat(2,minmax(0,1fr))}h1{font-size:19px}.actions .btn .lbl{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.thu{font-size:10.5px;font-weight:600;color:var(--dim);text-transform:none;letter-spacing:0}
+.na-rows input{min-height:40px}
+.na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}
+@media (max-width:600px){.na-rows td,.na-rows th{padding:6px 4px}.na-rows .na_id{width:84px}.na-rows .na_n{width:54px}.na-rows .na_kg{width:86px}.na-rows input{padding-left:8px;padding-right:8px}.na-rows .na_rm{padding:0 8px;min-height:40px}}
+.na-tot{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:8px}
 /* ---------- Local de armazenamento ---------- */
 .linkbtn{background:none;border:0;padding:2px 0;color:inherit;font:inherit;cursor:pointer;text-align:left;text-decoration:underline dotted;text-decoration-color:var(--dim);text-underline-offset:3px}
 .linkbtn:hover{color:var(--accent)}
@@ -1101,22 +1106,22 @@ function mediasCalc(list){
 function medias(saidas){
   const c=mediasCalc(saidas);
   if(!c) return `<p class="muted" style="margin:0">As médias aparecem depois da primeira retirada registrada.</p>`;
-  return `<div class="avg"><div><span>Média mensal</span><b>${nf(c.m)}</b></div><div><span>Trimestral</span><b>${nf(c.tri)}</b></div><div><span>Semestral</span><b>${nf(c.sem)}</b></div><div><span>Anual</span><b>${nf(c.ano)}</b></div></div>
+  return `<div class="avg"><div><span>Média mensal (un)</span><b>${nf(c.m)}</b></div><div><span>Trimestral (un)</span><b>${nf(c.tri)}</b></div><div><span>Semestral (un)</span><b>${nf(c.sem)}</b></div><div><span>Anual (un)</span><b>${nf(c.ano)}</b></div></div>
    <p class="sub" style="margin:0">${nf(c.tot)} unidades retiradas desde ${fmtD(c.first)}.</p>`;
 }
 function consumoProduto(saidas){
   const by={}; for(const m of saidas){ const k=m.produto||"—"; (by[k]=by[k]||[]).push(m); }
-  const R=rows(); const sd={}; for(const r of R){ if(r.saldo>0&&!r.descartada){ sd[r.produto]=(sd[r.produto]||0)+r.saldo; } }
+  const R=rows(); const sd={}, sk={}; for(const r of R){ if(r.saldo>0&&!r.descartada){ sd[r.produto]=(sd[r.produto]||0)+r.saldo; sk[r.produto]=(sk[r.produto]||0)+kgOf(r); } }
   const names=[...new Set([...Object.keys(by),...Object.keys(sd)])].sort((a,b)=>a.localeCompare(b,"pt"));
   if(!names.length) return `<p class="muted" style="margin:0">Sem dados ainda.</p>`;
-  return `<div class="tablebox"><table><thead><tr><th>Produto</th><th class="num">Saldo atual</th><th class="num">Total retirado</th><th class="num">Mensal</th><th class="num">Trimestral</th><th class="num">Semestral</th><th class="num">Anual</th><th class="num">Cobertura</th></tr></thead><tbody>
+  return `<div class="tablebox"><table><thead><tr><th>Produto</th><th class="num">Saldo atual<br><span class="thu">un</span></th><th class="num">Saldo atual<br><span class="thu">kg</span></th><th class="num">Total retirado<br><span class="thu">un</span></th><th class="num">Média mensal<br><span class="thu">un/mês</span></th><th class="num">Trimestral<br><span class="thu">un/trimestre</span></th><th class="num">Semestral<br><span class="thu">un/semestre</span></th><th class="num">Anual<br><span class="thu">un/ano</span></th><th class="num">Cobertura<br><span class="thu">meses</span></th></tr></thead><tbody>
    ${names.map(n=>{ const c=mediasCalc(by[n]||[]); const s=sd[n]||0; const cob=c&&c.m>0? s/c.m : null;
-     return `<tr class="row"><td class="prod">${esc(n)}</td><td class="num">${nf(s)}</td><td class="num">${c?nf(c.tot):"0"}</td><td class="num">${c?nf(c.m):"—"}</td><td class="num">${c?nf(c.tri):"—"}</td><td class="num">${c?nf(c.sem):"—"}</td><td class="num">${c?nf(c.ano):"—"}</td><td class="num">${cob==null?"—":nf(cob)+" meses"}</td></tr>`; }).join("")}
-   </tbody></table></div><p class="sub" style="margin:0">Cobertura = saldo atual dividido pela média mensal de retiradas.</p>`;
+     return `<tr class="row"><td class="prod">${esc(n)}</td><td class="num">${nf(s)} <span class="sub">un</span></td><td class="num">${sk[n]?fkg(sk[n])+' <span class="sub">kg</span>':"—"}</td><td class="num">${c?nf(c.tot):"0"} <span class="sub">un</span></td><td class="num">${c?nf(c.m):"—"}</td><td class="num">${c?nf(c.tri):"—"}</td><td class="num">${c?nf(c.sem):"—"}</td><td class="num">${c?nf(c.ano):"—"}</td><td class="num">${cob==null?"—":nf(cob)+" meses"}</td></tr>`; }).join("")}
+   </tbody></table></div><p class="sub" style="margin:0"><b>un</b> = unidades (volumes de amostra, cada pote, saco ou frasco conta 1). <b>kg</b> = soma do peso dos volumes em estoque. Médias calculadas sobre as unidades retiradas. Cobertura = saldo atual em unidades dividido pela média mensal de retiradas.</p>`;
 }
 
 /* ---------- Estoque ---------- */
-function opts(list, sel, blank){ return (blank!=null?`<option value="">${esc(blank)}</option>`:"")+list.map(v=>`<option${v===sel?" selected":""}>${esc(v)}</option>`).join(""); }
+function opts(list, sel, blank){ list=list||[]; if(sel&&!list.includes(sel)) list=[sel,...list]; return (blank!=null?`<option value="">${esc(blank)}</option>`:"")+list.map(v=>`<option${v===sel?" selected":""}>${esc(v)}</option>`).join(""); }
 function shellEstoque(){
   const f=S.f; const locais=[...new Set([...S.cfg.locais,...S.amostras.map(a=>a.local).filter(Boolean)])];
   return mobQuick()+ptabs("f","status",[["ativas","Em estoque"],["avencer","A vencer"],["vencida","Vencidas"],["esgotada","Esgotadas"],["todas","Todas"]])+`<div class="toolbar">
@@ -1504,16 +1509,45 @@ function formAmostra(a){
    <div class="field"><label for="a_cont">Conteúdo por unidade</label><input id="a_cont" value="${esc(a.conteudo)}" placeholder="ex.: 1 kg, 500 mL"></div>
    <div class="field"><label for="a_fab">Data de fabricação</label><input id="a_fab" type="date" value="${esc(a.fabricacao)}"></div>
    <div class="field"><label for="a_val">Data de validade *</label><input id="a_val" type="date" required value="${esc(a.validade)}"></div>
-   ${ed?"":`<div class="field"><label for="a_qtd">Quantidade guardada *</label><input id="a_qtd" type="number" min="0" step="any" inputmode="decimal" required></div>`}
+
    <div class="field"><label for="a_un">Unidade</label><select id="a_un">${opts(S.cfg.unidades,a.unidade)}</select></div>
    <div class="field"><label for="a_loc">Localização</label><input id="a_loc" list="dll" value="${esc(a.local)}">${dl("dll",locs)}</div>
    <div class="field"><label for="a_resp">Responsável</label><select id="a_resp">${opts(S.cfg.analistas,a.responsavel,"—")}</select></div>
-   ${ed?"":`<div class="field full"><label for="a_ids">ID das amostras</label><input id="a_ids" placeholder="ex.: A1, A2, B1, B2" style="font-family:var(--mono)"></div><div class="field"><label for="a_kgun">Peso por amostra (kg)</label><input id="a_kgun" type="number" step="0.001" min="0" inputmode="decimal" placeholder="ex.: 0,345"></div><div class="field"></div>`}
+   ${ed?"":`<div class="field full"><label>Amostras guardadas *</label>
+     <div class="sub" style="margin:0 0 6px">Uma linha por amostra: o ID da etiqueta, quantos volumes têm esse ID e o peso total desses volumes. Enter no peso abre a próxima linha. Também dá para colar uma lista do Excel (ID · volumes · peso).</div>
+     <div class="tablebox"><table class="na-rows"><thead><tr><th>ID</th><th class="num">Volumes<br><span class="thu">un</span></th><th class="num">Peso total<br><span class="thu">kg</span></th><th></th></tr></thead><tbody id="na_rows"></tbody></table></div>
+     <div class="na-tot"><button type="button" class="btn sm" id="na_add">+ Adicionar amostra</button><div class="sub" id="na_sum"></div></div></div>`}
    <div class="field full"><label for="a_obs">Observação</label><textarea id="a_obs">${esc(a.obs)}</textarea></div>
    <div class="formerr full" id="a_err"></div>`;
   const foot=`${ed?`<button type="button" class="btn danger" id="a_del" style="margin-right:auto">Excluir cadastro</button>`:""}<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">${ed?"Salvar alterações":"Cadastrar amostra"}</button>`;
-  const m=modal(ed?"Editar amostra":"Nova amostra",body,foot);
+  const m=modal(ed?"Editar amostra":"Nova amostra",body,foot,!ed);
   m.ov.querySelector("#a_prod").addEventListener("input",ev=>{ const mp=mapaDe(ev.target.value); if(mp) m.ov.querySelector("#a_mapa").value=mp; });
+  const NA=[{id:"",n:1,kg:""}];
+  const naFmt=v=>v===""||v==null?"":String(v);
+  const naSum=()=>{ const box=m.ov.querySelector("#na_sum"); if(!box) return; const ok=NA.filter(x=>x.id); const t=ok.reduce((s,x)=>s+(Number(x.n)||0),0), k=ok.reduce((s,x)=>s+(parseKg(String(x.kg))||0),0);
+    box.innerHTML=`Quantidade guardada: <b>${t}</b> ${esc(m.ov.querySelector("#a_un").value||"un")} · peso total <b>${fkg(k)}</b> kg`; };
+  const naDraw=(focusK)=>{ const tb=m.ov.querySelector("#na_rows"); if(!tb) return;
+    tb.innerHTML=NA.map((x,k)=>`<tr><td><input class="na_id" data-k="${k}" value="${esc(x.id)}" placeholder="ex.: A41" aria-label="ID da amostra ${k+1}" style="font-family:var(--mono);text-transform:uppercase"></td>
+      <td class="num"><input class="na_n" data-k="${k}" type="number" min="1" step="1" value="${x.n}" aria-label="Volumes da amostra ${k+1}" style="text-align:right"></td>
+      <td class="num"><input class="na_kg" data-k="${k}" inputmode="decimal" value="${esc(naFmt(x.kg))}" placeholder="0,000" aria-label="Peso total da amostra ${k+1} em kg" style="text-align:right;font-family:var(--mono)"></td>
+      <td><button type="button" class="btn sm na_rm" data-k="${k}" aria-label="Remover linha ${k+1}"${NA.length===1?" disabled":""}>×</button></td></tr>`).join("");
+    naSum(); if(focusK!=null){ const f=tb.querySelector(`.na_id[data-k="${focusK}"]`); if(f) f.focus(); } };
+  if(!ed){ naDraw();
+    m.ov.querySelector("#na_add").onclick=()=>{ NA.push({id:"",n:1,kg:""}); naDraw(NA.length-1); };
+    m.ov.querySelector("#a_un").addEventListener("change",naSum);
+    const tb=m.ov.querySelector("#na_rows");
+    tb.addEventListener("input",ev=>{ const t=ev.target, k=+t.dataset.k; if(!NA[k]) return;
+      if(t.classList.contains("na_id")) NA[k].id=t.value.trim().toUpperCase(); else if(t.classList.contains("na_n")) NA[k].n=parseInt(t.value)||0; else if(t.classList.contains("na_kg")) NA[k].kg=t.value; naSum(); });
+    tb.addEventListener("click",ev=>{ const b=ev.target.closest(".na_rm"); if(!b) return; ev.preventDefault(); NA.splice(+b.dataset.k,1); if(!NA.length) NA.push({id:"",n:1,kg:""}); naDraw(); });
+    tb.addEventListener("keydown",ev=>{ if(ev.key!=="Enter") return; const t=ev.target; if(!t.classList.contains("na_kg")&&!t.classList.contains("na_n")&&!t.classList.contains("na_id")) return; ev.preventDefault();
+      const k=+t.dataset.k; if(t.classList.contains("na_id")){ const nx=tb.querySelector(`.na_kg[data-k="${k}"]`); nx&&nx.focus(); return; }
+      if(k===NA.length-1){ NA.push({id:"",n:1,kg:""}); naDraw(NA.length-1); } else { const f=tb.querySelector(`.na_id[data-k="${k+1}"]`); f&&f.focus(); } });
+    tb.addEventListener("paste",ev=>{ const t=ev.target; if(!t.classList.contains("na_id")) return; const txt=(ev.clipboardData||window.clipboardData).getData("text"); if(!/[\t\n;]/.test(txt.trim())) return;
+      ev.preventDefault(); const k=+t.dataset.k;
+      const lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/\t|;/).map(c=>c.trim()));
+      const novos=lines.filter(c=>c[0]&&!/^id$/i.test(c[0])).map(c=>c.length>=3?{id:c[0].toUpperCase(),n:parseInt(c[1])||1,kg:c[2]}:{id:c[0].toUpperCase(),n:1,kg:c[1]||""});
+      if(!novos.length) return; const vazio=!NA[k].id&&!NA[k].kg; NA.splice(vazio?k:k+1,vazio?1:0,...novos); naDraw(); toast(`${novos.length} amostra${novos.length===1?"":"s"} colada${novos.length===1?"":"s"}`); });
+  }
   if(ed) m.ov.querySelector("#a_del").onclick=()=>{ m.close(); confirmar("Excluir cadastro",`Apaga o lote ${a.lote} de ${a.produto} e todas as suas movimentações. Use só para cadastro feito por engano; para amostra usada ou vencida, registre a retirada ou o descarte.`,"Excluir",()=>guard(()=>store.deleteAmostra(a.id),"Cadastro excluído")); };
   m.form.onsubmit=async e=>{
     e.preventDefault(); const g=id=>m.ov.querySelector("#"+id).value.trim();
@@ -1521,13 +1555,20 @@ function formAmostra(a){
     const err=m.ov.querySelector("#a_err");
     if(!d.produto||!d.lote||!d.validade){ err.textContent="Preencha produto, lote e data de validade."; return; }
     if(d.fabricacao&&d.validade<d.fabricacao){ err.textContent="A validade não pode ser anterior à fabricação."; return; }
-    let qtd=0; if(!ed){ qtd=Number(g("a_qtd").replace(",",".")); if(!(qtd>0)){ err.textContent="Informe a quantidade guardada (maior que zero)."; return; } }
+    let qtd=0, naIds=[], naQ={}, naKg={};
+    if(!ed){ const L=NA.filter(x=>x.id||String(x.kg).trim());
+      if(!L.length){ err.textContent="Inclua pelo menos uma amostra com o ID da etiqueta."; return; }
+      for(const [k,x] of L.entries()){ if(!x.id){ err.textContent=`A linha ${k+1} tem peso mas não tem ID.`; return; } if(!(x.n>=1)){ err.textContent=`O ID ${x.id} precisa de pelo menos 1 volume.`; return; }
+        if(naIds.includes(x.id)){ err.textContent=`O ID ${x.id} aparece mais de uma vez. Junte os volumes numa linha só.`; return; }
+        const kg=String(x.kg).trim()?parseKg(String(x.kg)):0; if(String(x.kg).trim()&&!(kg>0)){ err.textContent=`O peso do ID ${x.id} não é um número válido.`; return; }
+        naIds.push(x.id); if(x.n>1) naQ[x.id]=x.n; if(kg) naKg[x.id]=Math.round(kg*1000)/1000; qtd+=x.n; }
+      const semPeso=naIds.filter(i=>!naKg[i]); if(semPeso.length&&!err.dataset.semkg){ err.textContent=`Sem peso: ${semPeso.join(", ")}. Clique de novo para cadastrar mesmo assim, ou preencha o peso.`; err.dataset.semkg="1"; return; } }
     const dup=S.amostras.find(x=>x.id!==a.id&&norm(x.produto)===norm(d.produto)&&norm(x.lote)===norm(d.lote)&&x.tipo===d.tipo&&!x.descartada);
     if(dup&&!err.dataset.dupok){ err.textContent="Já existe esse produto/lote/tipo em estoque. Para somar unidades use “+ Entrada” no lote existente. Clique de novo para cadastrar mesmo assim."; err.dataset.dupok="1"; return; }
     if(d.responsavel) LS.set("resp",d.responsavel);
     m.close();
     if(ed) await guard(()=>store.updateAmostra(a.id,{...d,atualizadoEm:hoje()}),"Amostra atualizada");
-    else { const ni=parseIds(g("a_ids")); if(ni.length){ d.ids=ni; const ku=Number(g("a_kgun"))||0; if(ku){ d.idsKg={}; ni.forEach(i=>d.idsKg[i]=ku); } } await guard(()=>store.addAmostra(d,qtd,d.responsavel),"Amostra cadastrada"); }
+    else { d.ids=naIds; if(Object.keys(naQ).length) d.idsQ=naQ; if(Object.keys(naKg).length) d.idsKg=naKg; await guard(()=>store.addAmostra(d,qtd,d.responsavel),"Amostra cadastrada"); }
   };
 }
 
