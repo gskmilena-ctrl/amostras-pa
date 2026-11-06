@@ -234,6 +234,7 @@ td>.rowacts{min-width:172px}
 @media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.modal .body{grid-template-columns:minmax(0,1fr)}.avg{grid-template-columns:repeat(2,minmax(0,1fr))}h1{font-size:19px}.actions .btn .lbl{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.obsc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:520px}
 .thu{font-size:10.5px;font-weight:600;color:var(--dim);text-transform:none;letter-spacing:0}
 .na-rows input{min-height:40px}
 .na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}
@@ -618,6 +619,8 @@ const norm = s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCas
 const PRODS = ()=>(S.cfg.produtos||[]).map(p=>typeof p==="string"?{nome:p,mapa:"",categoria:""}:p);
 const mapaDe = nome=>{ const p=PRODS().find(x=>norm(x.nome)===norm(nome)); return p?p.mapa||"":""; };
 function mais2anos(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||"")) return ""; let [y,mo,d]=iso.split("-").map(Number); y+=2; const last=new Date(Date.UTC(y,mo,0)).getUTCDate(); return `${y}-${String(mo).padStart(2,"0")}-${String(Math.min(d,last)).padStart(2,"0")}`; }
+/* observação do movimento; no cadastro inicial mostra a observação do lote */
+function obsMov(m){ if(m.obs) return m.obs; if(m.tipo==="entrada"&&m.motivo==="Cadastro inicial"){ const a=S.amostras.find(x=>x.id===m.amostraId); return (a&&a.obs)||""; } return ""; }
 const codigoDe = nome=>{ const p=PRODS().find(x=>norm(x.nome)===norm(nome)); return p?String(p.codigo||""):""; };
 /* Códigos internos da planilha "Produto.xls" (nov/2026), só dos produtos cadastrados no app */
 const CODIGOS_PLANILHA = {"Polpa de Acerola Madura NFC Asséptica": "31088", "Polpa de Acerola Madura NFC Congelada": "28916", "Polpa de Acerola Madura Orgânica NFC Asséptica": "31087", "Polpa de Acerola Madura Orgânica NFC Congelada": "12133", "Polpa de Acerola Verde Orgânica NFC Congelada": "12129", "Polpa de Mamão Vermelha NFC Asséptica": "28915", "Polpa de Mamão Vermelha Orgânica NFC Congelada": "12139", "Suco Acerola Madura Orgânico 65 °Brix UF Congelado": "12136", "Suco Acerola Verde 65 °Brix UF Congelado": "25778", "Suco Acerola Verde Orgânico 20 °Brix Cloudy Congelado": "23600", "Suco Acerola Verde Orgânico 20 °Brix Congelado": "25494", "Suco Acerola Verde Orgânico 50 °Brix Cloudy Congelado": "12130", "Suco Acerola Verde Orgânico 50 °Brix UF Congelado": "12131", "Suco Acerola Verde Orgânico 65 °Brix UF Congelado": "25777", "Suco Acerola Verde Orgânico UF Congelado": "20565", "Suco Acerola Vermelha 65 °Brix Cloudy Congelado": "29913", "Suco Acerola Vermelha Orgânico 65 °Brix Cloudy Congelado": "12135", "Suco Concentrado Acerola Madura 20 °B": "22634", "Suco Concentrado Acerola Madura 30 °B": "22633", "Suco Concentrado de Acerola Madura 65 °B UF": "22632", "Suco Concentrado Mamão 25 °Brix Asséptico": "29045", "Suco Concentrado Mamão Orgânico 25 °Brix Asséptico": "18412", "Suco Concentrado Mamão Orgânico 25 °Brix Congelado": "18413", "Suco Tropical de Acerola Verde Orgânico Congelado": "20204", "Suco de Acerola Madura Orgânico 20 °Brix Congelado": "22171", "Suco de Acerola Madura Orgânico 30 °Brix Congelado": "22170", "Suco de Acerola Verde 50 °Brix Cloudy Congelado": "24479"};
@@ -697,7 +700,7 @@ const store = {
     const id=uid(); const doc={...a, criadoEm:new Date().toISOString(), atualizadoEm:data||hoje(), descartada:false};
     if(db){ await db.collection("amostras").doc(id).set(doc); }
     else { S.amostras.push({id,...doc}); }
-    if(qtd>0) await store.addMov({amostraId:id, produto:a.produto, lote:a.lote, tipo:"entrada", qtd, data:data||hoje(), motivo:"Cadastro inicial", destino:"", responsavel:resp||a.responsavel||"", obs:""}, true);
+    if(qtd>0) await store.addMov({amostraId:id, produto:a.produto, lote:a.lote, tipo:"entrada", qtd, data:data||hoje(), motivo:"Cadastro inicial", destino:"", responsavel:resp||a.responsavel||"", obs:a.obs||""}, true);
     else if(!db) refresh();
     return id;
   },
@@ -1227,7 +1230,7 @@ function dataMovs(){
         <div style="text-align:right"><div class="mbig" style="color:${MC[m.tipo]||"inherit"}">${sinal(m)}${nf(Math.abs(m.qtd))}</div><div class="mmeta">${m.kg?fkg(m.kg)+" kg":""}</div></div></div>
       <div class="mmeta"><b class="mv-${m.tipo}">${MV_LABEL[m.tipo]||esc(m.tipo)}</b>${m.tipo==="saida"||m.tipo==="descarte"?" · "+esc(catOf(m)):""} · <span class="mono">${fmtD(m.data)}</span>${m.responsavel?" · "+esc(m.responsavel):""}${m.fotos?` · 📷 ${m.fotos}`:""}</div>
       ${m.motivo||m.cliente||m.destino?`<div class="mmeta">${[m.motivo,m.cliente||m.destino].filter(Boolean).map(esc).join(" → ")}</div>`:""}
-      ${m.obs?`<div class="mmeta" style="font-style:italic">${esc(m.obs)}</div>`:""}
+      ${obsMov(m)?`<div class="mmeta obsc" style="font-style:italic" title="${esc(obsMov(m))}">${esc(obsMov(m))}</div>`:""}
       ${stBadge(m)?`<div>${stBadge(m)}</div>`:""}${confLinha(m)}
       ${(m.tipo==="saida"||m.tipo==="descarte")||(FULL()&&!S.readonly)?`<div class="macts">${m.tipo==="saida"||m.tipo==="descarte"?`<button class="btn sm" data-act="evid" data-id="${m.id}">Evidências${m.fotos?` (${m.fotos})`:""}</button>`:""}${!FULL()||S.readonly?"":`<button class="btn sm" data-act="delmov" data-id="${m.id}">Desfazer</button>`}</div>`:""}</div>`).join("")}</div>${M.length>lim?`<button class="btn" style="width:100%" data-act="mais" data-k="movs">Mostrar mais (${M.length-lim} restantes)</button>`:""}`; }
   return resumo+`
@@ -1235,7 +1238,7 @@ function dataMovs(){
   ${M.slice(0,500).map(m=>`<tr class="row"><td class="mono">${fmtD(m.data)}</td><td class="nowrap mv-${m.tipo}"><b>${MV_LABEL[m.tipo]||esc(m.tipo)}</b>${m.status==="pendente"?`<div class="sub" style="color:var(--warn)">⏳ aguardando confirmação</div>`:m.status==="recusada"?`<div class="sub" style="color:var(--bad)" title="${esc(m.recusaMotivo||"")}">✕ recusada</div>`:""}</td>
     <td class="prod">${esc(m.produto)}</td><td class="mono">${esc(m.lote)}${m.ids?`<div class="sub">ID ${esc(m.ids)}</div>`:""}${m.kg?`<div class="sub">${fkg(m.kg)} kg</div>`:""}</td>
     <td class="num">${Number(m.qtd)===0?"":(m.tipo==="entrada"||m.tipo==="reclass_in"||m.tipo==="ajuste"&&m.qtd>0?"+":"−")}${nf(Math.abs(m.qtd))}</td>
-    <td>${esc(m.motivo||"")}</td><td>${esc(m.cliente||m.destino||"")}</td><td class="nowrap">${esc(m.responsavel||"")}</td><td class="sub">${esc(m.obs||"")}</td>
+    <td>${esc(m.motivo||"")}</td><td>${esc(m.cliente||m.destino||"")}</td><td class="nowrap">${esc(m.responsavel||"")}</td><td class="sub"><div class="obsc" title="${esc(obsMov(m))}">${esc(obsMov(m))}</div></td>
     <td><div class="rowacts">${podeConfirmar(m)?`<button class="btn sm primary" data-act="confmov" data-id="${m.id}">Confirmar</button><button class="btn sm danger" data-act="recmov" data-id="${m.id}">Recusar</button>`:""}${m.status==="pendente"&&m.por===S.myId&&!podeConfirmar(m)?`<button class="btn sm" data-act="canmov" data-id="${m.id}">Cancelar</button>`:""}${m.tipo==="saida"||m.tipo==="descarte"?`<button class="btn sm" data-act="evid" data-id="${m.id}" title="Fotos de evidência">📷 ${m.fotos||0}</button>`:""}${!FULL()||S.readonly?"":`<button class="btn sm" data-act="delmov" data-id="${m.id}" title="Desfazer lançamento">Desfazer</button>`}</div></td></tr>`).join("")}
   </tbody></table></div>${M.length>500?`<div class="sub">Mostrando os 500 mais recentes. Use os filtros ou exporte para ver todos.</div>`:""}`;
 }
@@ -1468,7 +1471,12 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="novocli") formCliente();
   else if(act==="cli") clienteDetalhe(id);
   else if(act==="enviarcli") formMov(null,"saida",id);
-  else if(act==="delmov") confirmar("Desfazer lançamento","Esta movimentação será apagada e o saldo do lote recalculado. As fotos de evidência dela também são apagadas.","Desfazer", ()=>guard(()=>store.deleteMov(id),"Lançamento desfeito"));
+  else if(act==="delmov"){ const m=S.movs.find(x=>x.id===id); if(!m) return; const ini=m.tipo==="entrada"&&m.motivo==="Cadastro inicial";
+    const txt=`Apaga só este lançamento (${MV_LABEL[m.tipo]||m.tipo} de ${nf(Math.abs(m.qtd))} em ${fmtD(m.data)}, lote ${m.lote}); o cadastro do lote e os outros lançamentos continuam.`
+      +(ini?" Atenção: é o cadastro inicial do lote, então o saldo volta a zero e o lote aparece como esgotado.":"")
+      +((m.tipo==="saida"||m.tipo==="descarte")&&ATIVA(m)?" O saldo volta, mas os IDs e o peso que saíram não voltam sozinhos: corrija em Ajustar volumes e saldo.":"")
+      +(m.fotos?" As fotos de evidência dele também são apagadas.":"");
+    confirmar("Desfazer lançamento",txt,"Desfazer", ()=>guard(()=>store.deleteMov(id),"Lançamento desfeito")); }
   else if(act==="rmlist"){ const k=b.dataset.k,i=+b.dataset.i; const cfg={...S.cfg,[k]:S.cfg[k].filter((_,j)=>j!==i)}; await guard(()=>store.saveCfg(cfg)); refresh(true); }
   else if(act==="rmprod"){ const i=+b.dataset.i; const cfg={...S.cfg,produtos:PRODS().filter((_,j)=>j!==i)}; await guard(()=>store.saveCfg(cfg)); refresh(true); }
   else if(act==="savealerta"){ const v=Math.max(1,parseInt($("#cfgal").value)||60); await guard(()=>store.saveCfg({...S.cfg,alerta:v}),"Alerta salvo"); refresh(true); }
@@ -1875,7 +1883,7 @@ function historico(id){
    <div class="full" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">${info.map(([k,v])=>`<div><div class="sub">${k}</div><div>${esc(v)}</div></div>`).join("")}</div>
    ${(r.locaisHist||[]).length?`<div class="full"><div class="sub" style="margin-bottom:4px">Mudanças de local</div><div class="tablebox"><table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Responsável</th><th>Obs.</th></tr></thead><tbody>${r.locaisHist.slice().reverse().map(h=>`<tr><td class="mono">${fmtD(h.data)}</td><td>${esc(h.de||"—")}</td><td><b>${esc(h.para)}</b></td><td>${esc(h.resp||h.por||"")}</td><td class="sub">${esc(h.obs||"")}</td></tr>`).join("")}</tbody></table></div></div>`:""}
    <div class="full tablebox"><table><thead><tr><th>Data</th><th>Tipo</th><th class="num">Qtd</th><th>Motivo</th><th>Destino</th><th>Responsável</th><th>Obs.</th></tr></thead><tbody>
-   ${M.map(m=>`<tr><td class="mono">${fmtD(m.data)}</td><td class="mv-${m.tipo}"><b>${MV_LABEL[m.tipo]||esc(m.tipo)}</b></td><td class="num">${Number(m.qtd)===0?"":((m.tipo==="entrada"||m.tipo==="reclass_in"||(m.tipo==="ajuste"&&m.qtd>0))?"+":"−")}${nf(Math.abs(m.qtd))}</td><td>${esc(m.motivo)}</td><td>${esc(m.destino)}</td><td>${esc(m.responsavel)}</td><td class="sub">${esc(m.obs)}${m.ids?` · ID ${esc(m.ids)}`:""}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">Sem movimentações.</td></tr>`}
+   ${M.map(m=>`<tr><td class="mono">${fmtD(m.data)}</td><td class="mv-${m.tipo}"><b>${MV_LABEL[m.tipo]||esc(m.tipo)}</b></td><td class="num">${Number(m.qtd)===0?"":((m.tipo==="entrada"||m.tipo==="reclass_in"||(m.tipo==="ajuste"&&m.qtd>0))?"+":"−")}${nf(Math.abs(m.qtd))}</td><td>${esc(m.motivo)}</td><td>${esc(m.destino)}</td><td>${esc(m.responsavel)}</td><td class="sub">${esc(m.obs||"")}${m.ids?` · ID ${esc(m.ids)}`:""}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">Sem movimentações.</td></tr>`}
    </tbody></table></div>`;
   const ro=S.readonly;
   const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&!r.descartada?`<button type="button" class="btn" id="h_lc">Mudar local</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
