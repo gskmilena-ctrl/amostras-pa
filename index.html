@@ -240,6 +240,12 @@ td>.rowacts{min-width:172px}
 .na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}
 @media (max-width:600px){.na-rows td,.na-rows th{padding:6px 4px}.na-rows .na_id{width:84px}.na-rows .na_n{width:54px}.na-rows .na_kg{width:86px}.na-rows input{padding-left:8px;padding-right:8px}.na-rows .na_rm{padding:0 8px;min-height:40px}}
 .na-tot{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:8px}
+.fieldbox{min-height:44px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);font-weight:700;line-height:1.35}
+.lotsug{border:1px solid var(--line2);border-radius:12px;background:var(--surface);max-height:300px;overflow-y:auto;margin-top:-6px}
+.lsug{display:grid;grid-template-columns:120px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+.lsug:hover,.lsug:focus{background:var(--accent-soft);outline:none}
+.lsug .lsp{min-width:0}.lsug .lss{white-space:nowrap;color:var(--muted)}
+@media (max-width:600px){.lsug{grid-template-columns:1fr auto}.lsug .lsp{grid-column:1/-1;grid-row:2;font-size:13px;color:var(--muted)}}
 /* ---------- Local de armazenamento ---------- */
 .linkbtn{background:none;border:0;padding:2px 0;color:inherit;font:inherit;cursor:pointer;text-align:left;text-decoration:underline dotted;text-decoration-color:var(--dim);text-underline-offset:3px}
 .linkbtn:hover{color:var(--accent)}
@@ -1618,8 +1624,11 @@ function formMov(id, tipo, clienteId){
   if(!r&&!elig.length){ toast("Não há amostras com saldo para retirar."); return; }
   const titles={saida:"Registrar retirada",entrada:"Registrar entrada",descarte:"Registrar descarte"};
   const motivos= tipo==="descarte"? S.cfg.motivos.filter(m=>/descarte/i.test(m)) : tipo==="entrada"? ["Complemento de amostra","Devolução","Ajuste de inventário"] : S.cfg.motivos.filter(m=>!/descarte/i.test(m));
-  const sel = r? `<div class="ref full" id="m_ref"></div><input type="hidden" id="m_am" value="${r.id}">`
-    : `<div class="field full"><label for="m_am">Amostra (produto · lote)</label><select id="m_am">${elig.map(x=>`<option value="${x.id}">${esc(x.produto)} · lote ${esc(x.lote)} · saldo ${nf(x.saldo)} ${esc(x.unidade||"")}${x.st==="vencida"?" (vencida)":""}</option>`).join("")}</select></div><div class="ref full" id="m_ref"></div>`;
+  const sel=`<div class="field"><label for="m_lotq">Lote *</label><input id="m_lotq" autocomplete="off" value="${r?esc(r.lote):""}" placeholder="Digite o lote, ex.: 31484-1" style="font-family:var(--mono)"${r?" readonly":""}></div>
+    <div class="field"><label for="m_saldov">Saldo disponível</label><input id="m_saldov" readonly tabindex="-1" placeholder="—" style="font-family:var(--mono)"></div>
+    <div class="field full"><label>Produto</label><div id="m_prodv" class="fieldbox" aria-live="polite"></div></div>
+    <div class="full lotsug" id="m_lotsug" hidden></div>
+    <input type="hidden" id="m_am" value="${r?r.id:""}"><div class="ref full" id="m_ref"></div>`;
   const out=tipo!=="entrada";
   const catIni=clienteId?(isLab(clienteId)?"Laboratório externo":"Cliente"):"";
   const body=`${sel}
@@ -1652,6 +1661,7 @@ function formMov(id, tipo, clienteId){
   const estKg=()=>{ const io=idsOf(r); return Object.keys(selQ).reduce((s,i)=>s+kgUnit(io,i)*selQ[i],0); };
   const selUnits=()=>Object.values(selQ).reduce((s,n)=>s+n,0);
   const paint=(fromInput)=>{
+    if(!r){ const b1=q("#m_selbox"); if(b1) b1.innerHTML=""; const b2=q("#m_ids"); if(b2&&!fromInput) b2.value=""; return; }
     const io=idsOf(r);
     if(out){
       if(!fromInput) q("#m_ids").value=tokens();
@@ -1668,14 +1678,16 @@ function formMov(id, tipo, clienteId){
       m.ov.querySelectorAll(".idc").forEach(b=>{ const on=!!selQ[b.dataset.id]; b.style.background=on?"var(--accent)":"var(--sunk)"; b.style.color=on?"var(--accent-ink)":"var(--ink)"; });
     }
   };
-  const upd=()=>{ r=R.find(x=>x.id===q("#m_am").value); selQ={}; RES=reservas(r.id); q("#m_ref").innerHTML=`<div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span> · validade ${fmtD(r.validade)} · ${esc(r.local||"sem local")}</div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")} em estoque</span>${r.pendOut?`<div class="sub" style="color:var(--warn)">${nf(r.pendOut)} reservada${r.pendOut===1?"":"s"} em saídas aguardando confirmação · disponível ${nf(r.disp)}</div>`:""}</div>`;
+  const upd=()=>{ r=R.find(x=>x.id===q("#m_am").value); selQ={};
+    if(!r){ q("#m_ref").innerHTML=""; q("#m_ref").hidden=true; const bx=q("#m_idchips"); if(bx) bx.innerHTML=out?`<span class="sub">Digite o lote para ver os IDs em estoque.</span>`:""; q("#m_prodv").innerHTML='<span class="sub">Aparece ao escolher o lote</span>'; q("#m_saldov").value=""; paint(); return; }
+    q("#m_ref").hidden=false; q("#m_prodv").textContent=r.produto; q("#m_saldov").value=`${nf(out?r.disp:r.saldo)} ${r.unidade||"un"}${r.st==="vencida"?" · vencida":""}`; RES=reservas(r.id); q("#m_ref").innerHTML=`<div><div class="sub">Validade ${fmtD(r.validade)} · ${esc(r.local||"sem local")}</div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")} em estoque</span>${r.pendOut?`<div class="sub" style="color:var(--warn)">${nf(r.pendOut)} reservada${r.pendOut===1?"":"s"} em saídas aguardando confirmação · disponível ${nf(r.disp)}</div>`:""}</div>`;
     if(tipo==="descarte") q("#m_qtd").value=r.disp;
     const io=idsOf(r), box=q("#m_idchips");
     if(!out||!io.ids.length){ box.innerHTML=out?`<span class="sub">Nenhum ID registrado para este lote.</span>`:""; }
     else { box.innerHTML=`<span class="sub" style="width:100%">IDs em estoque (${io.ids.length}) · clique para retirar 1 volume${io.conf?` · <span style="color:var(--warn)">conferir: ${esc(io.conf)}</span>`:""}</span>`+io.ids.filter(i=>!out||avail(io,i)>0).map(i=>`<button type="button" class="chip idc" data-id="${esc(i)}" style="padding:3px 10px;cursor:pointer;font-family:var(--mono);border:1px solid var(--line)">${esc(idLabel(i,io.q,io.kg))}</button>`).join("");
       if(tipo==="descarte"){ io.ids.forEach(i=>{ const av=avail(io,i); if(av>0) selQ[i]=av; }); } }
     paint(); };
-  m.ov.addEventListener("click",ev=>{ const io=idsOf(r);
+  m.ov.addEventListener("click",ev=>{ const sg=ev.target.closest(".lsug"); if(sg){ ev.preventDefault(); escolherLote(sg.dataset.id); return; } if(!r) return; const io=idsOf(r);
     const c=ev.target.closest(".idc"); if(c){ const i=c.dataset.id; if(selQ[i]) delete selQ[i]; else selQ[i]=1; paint(); return; }
     const p=ev.target.closest(".selp"), mi=ev.target.closest(".selm"), x=ev.target.closest(".selx");
     if(p){ const i=p.dataset.id; selQ[i]=Math.min(avail(io,i),selQ[i]+1); paint(); }
@@ -1683,12 +1695,24 @@ function formMov(id, tipo, clienteId){
     else if(x){ delete selQ[x.dataset.id]; paint(); } });
   const showKg=()=>{ const kin=q("#m_kg"), o=q("#m_kgparse"); if(!kin||!o) return; const v=parseKg(kin.value);
     o.innerHTML=!kin.value.trim()?"Aceita vírgula ou ponto. Vários pesos colados (um por linha) são somados.":v==null?`<span style="color:var(--bad)">Não entendi esse peso. Use números, ex.: 0,250</span>`:`Peso a registrar: <b style="font-family:var(--mono)">${fkg(v)} kg</b>`; };
-  m.ov.addEventListener("input",ev=>{ if(ev.target.id==="m_ids"&&out){ selQ=parseSel(ev.target.value); paint(true); } if(ev.target.id==="m_kg"){ ev.target.dataset.touched=ev.target.value.trim()?"1":""; showKg(); } });
+  m.ov.addEventListener("input",ev=>{ if(ev.target.id==="m_lotq"){ buscaLote(); return; } if(ev.target.id==="m_ids"&&out){ if(!r) return; selQ=parseSel(ev.target.value); paint(true); } if(ev.target.id==="m_kg"){ ev.target.dataset.touched=ev.target.value.trim()?"1":""; showKg(); } });
   m.ov.addEventListener("paste",ev=>{ if(ev.target.id!=="m_kg") return; const t=(ev.clipboardData||window.clipboardData)?.getData("text"); if(!t) return; ev.preventDefault();
     const v=parseKg(t); ev.target.value=v==null?t.trim():String(v).replace(".",","); ev.target.dataset.touched="1"; showKg(); });
-  upd(); if(!id) q("#m_am").onchange=upd;
+  /* busca pelo lote */
+  const escolherLote=aid=>{ const x=elig.find(z=>z.id===aid); if(!x) return; q("#m_am").value=x.id; q("#m_lotq").value=x.lote; q("#m_lotsug").hidden=true; q("#m_lotsug").innerHTML=""; upd(); };
+  const buscaLote=()=>{ const t=norm(q("#m_lotq").value).replace(/\s/g,""); const box=q("#m_lotsug");
+    if(q("#m_am").value){ const cur=R.find(x=>x.id===q("#m_am").value); if(!cur||norm(cur.lote).replace(/\s/g,"")!==t){ q("#m_am").value=""; upd(); } }
+    if(!t){ box.hidden=true; box.innerHTML=""; return; }
+    const L=elig.filter(x=>norm(String(x.lote)).replace(/\s/g,"").includes(t)).sort((a,b)=>{ const ea=norm(a.lote)===t?0:norm(a.lote).startsWith(t)?1:2, eb=norm(b.lote)===t?0:norm(b.lote).startsWith(t)?1:2; return ea-eb||String(a.lote).localeCompare(String(b.lote),undefined,{numeric:true}); });
+    const ex=L.filter(x=>norm(String(x.lote)).replace(/\s/g,"")===t);
+    if(ex.length===1&&!q("#m_am").value){ escolherLote(ex[0].id); return; }
+    box.hidden=false;
+    box.innerHTML=L.length?`<div class="sub" style="padding:6px 12px">${L.length>8?`${L.length} lotes encontrados · mostrando 8, continue digitando`:`${L.length} lote${L.length===1?"":"s"} encontrado${L.length===1?"":"s"} · toque para escolher`}</div>`+L.slice(0,8).map(x=>`<button type="button" class="lsug" data-id="${x.id}"><span class="mono"><b>${esc(x.lote)}</b></span><span class="lsp">${esc(x.produto)}</span><span class="mono lss">${nf(out?x.disp:x.saldo)} ${esc(x.unidade||"un")}${x.st==="vencida"?` <span style="color:var(--bad)">vencida</span>`:""}</span></button>`).join("")
+      :`<div class="sub" style="padding:10px 12px">Nenhum lote ${tipo==="entrada"?"":"com saldo "}com esse número.</div>`; };
+  if(!id){ const li=q("#m_lotq"); li.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); const f=q("#m_lotsug .lsug"); if(f) escolherLote(f.dataset.id); } }); setTimeout(()=>li.focus(),60); }
+  upd();
   m.form.onsubmit=async e=>{
-    e.preventDefault(); const err=q("#m_err");
+    e.preventDefault(); const err=q("#m_err"); if(!r){ err.textContent="Digite o lote e escolha a amostra."; q("#m_lotq").focus(); return; }
     const qtd=Number(q("#m_qtd").value.replace(",",".")); const resp=q("#m_resp").value; const data=q("#m_data").value;
     if(!(qtd>0)){ err.textContent="Informe uma quantidade maior que zero."; return; }
     if(out&&qtd>r.disp+1e-9){ err.textContent=r.pendOut?`A quantidade passa do disponível (${nf(r.disp)}): ${nf(r.pendOut)} já está${r.pendOut===1?"":"o"} reservada${r.pendOut===1?"":"s"} em saídas aguardando confirmação.`:`A quantidade passa do saldo do lote (${nf(r.saldo)}).`; return; }
