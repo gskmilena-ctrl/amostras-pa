@@ -617,6 +617,26 @@ const uid = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const norm = s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
 const PRODS = ()=>(S.cfg.produtos||[]).map(p=>typeof p==="string"?{nome:p,mapa:"",categoria:""}:p);
 const mapaDe = nome=>{ const p=PRODS().find(x=>norm(x.nome)===norm(nome)); return p?p.mapa||"":""; };
+function mais2anos(iso){ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||"")) return ""; let [y,mo,d]=iso.split("-").map(Number); y+=2; const last=new Date(Date.UTC(y,mo,0)).getUTCDate(); return `${y}-${String(mo).padStart(2,"0")}-${String(Math.min(d,last)).padStart(2,"0")}`; }
+const codigoDe = nome=>{ const p=PRODS().find(x=>norm(x.nome)===norm(nome)); return p?String(p.codigo||""):""; };
+/* Códigos internos da planilha "Produto.xls" (nov/2026), só dos produtos cadastrados no app */
+const CODIGOS_PLANILHA = {"Polpa de Acerola Madura NFC Asséptica": "31088", "Polpa de Acerola Madura NFC Congelada": "28916", "Polpa de Acerola Madura Orgânica NFC Asséptica": "31087", "Polpa de Acerola Madura Orgânica NFC Congelada": "12133", "Polpa de Acerola Verde Orgânica NFC Congelada": "12129", "Polpa de Mamão Vermelha NFC Asséptica": "28915", "Polpa de Mamão Vermelha Orgânica NFC Congelada": "12139", "Suco Acerola Madura Orgânico 65 °Brix UF Congelado": "12136", "Suco Acerola Verde 65 °Brix UF Congelado": "25778", "Suco Acerola Verde Orgânico 20 °Brix Cloudy Congelado": "23600", "Suco Acerola Verde Orgânico 20 °Brix Congelado": "25494", "Suco Acerola Verde Orgânico 50 °Brix Cloudy Congelado": "12130", "Suco Acerola Verde Orgânico 50 °Brix UF Congelado": "12131", "Suco Acerola Verde Orgânico 65 °Brix UF Congelado": "25777", "Suco Acerola Verde Orgânico UF Congelado": "20565", "Suco Acerola Vermelha 65 °Brix Cloudy Congelado": "29913", "Suco Acerola Vermelha Orgânico 65 °Brix Cloudy Congelado": "12135", "Suco Concentrado Acerola Madura 20 °B": "22634", "Suco Concentrado Acerola Madura 30 °B": "22633", "Suco Concentrado de Acerola Madura 65 °B UF": "22632", "Suco Concentrado Mamão 25 °Brix Asséptico": "29045", "Suco Concentrado Mamão Orgânico 25 °Brix Asséptico": "18412", "Suco Concentrado Mamão Orgânico 25 °Brix Congelado": "18413", "Suco Tropical de Acerola Verde Orgânico Congelado": "20204", "Suco de Acerola Madura Orgânico 20 °Brix Congelado": "22171", "Suco de Acerola Madura Orgânico 30 °Brix Congelado": "22170", "Suco de Acerola Verde 50 °Brix Cloudy Congelado": "24479"};
+function codigosPendentes(){
+  const P=PRODS(); const cp={}; for(const k in CODIGOS_PLANILHA) cp[norm(k)]=CODIGOS_PLANILHA[k];
+  const prods=P.filter(p=>!p.codigo&&cp[norm(p.nome)]).map(p=>({nome:p.nome,codigo:cp[norm(p.nome)]}));
+  const codOf=nome=>{ const p=P.find(x=>norm(x.nome)===norm(nome)); return (p&&p.codigo)||cp[norm(nome)]||""; };
+  const lotes=S.amostras.filter(a=>!a.codigo&&codOf(a.produto)).map(a=>({id:a.id,codigo:codOf(a.produto)}));
+  return {prods,lotes};
+}
+async function aplicarCodigos(){
+  const {prods,lotes}=codigosPendentes(); if(!prods.length&&!lotes.length){ toast("Nada para aplicar."); return; }
+  await guard(async()=>{
+    if(prods.length){ const map=Object.fromEntries(prods.map(x=>[norm(x.nome),x.codigo])); await store.saveCfg({...S.cfg,produtos:PRODS().map(p=>map[norm(p.nome)]&&!p.codigo?{...p,codigo:map[norm(p.nome)]}:p)}); }
+    if(db){ for(let i=0;i<lotes.length;i+=400){ const bt=db.batch(); lotes.slice(i,i+400).forEach(l=>bt.update(db.collection("amostras").doc(l.id),{codigo:l.codigo})); await bt.commit(); } }
+    else lotes.forEach(l=>{ const a=S.amostras.find(x=>x.id===l.id); if(a) a.codigo=l.codigo; });
+  },`Códigos aplicados: ${prods.length} produto${prods.length===1?"":"s"} e ${lotes.length} lote${lotes.length===1?"":"s"}`);
+  refresh(true);
+}
 const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
@@ -1396,10 +1416,11 @@ function dataCadastros(){
     <button class="btn" data-act="savealerta"${ro?" disabled":""}>Salvar</button></div>
     <p class="sub" style="margin:0">Mesma regra da planilha: acima do prazo fica “Ok”, dentro do prazo “A vencer”, na data ou depois “Vencida”.</p></div>
   <div class="panel"><h2>Produtos acabados <small>${PRODS().length} cadastrados</small></h2>
-    <p class="sub" style="margin:0">Ao escolher o produto no cadastro da amostra, o registro MAPA é preenchido sozinho.</p>
-    ${ro?"":`<form class="addprod toolbar"><div class="field grow"><label for="np_nome">Nome comercial</label><input id="np_nome" required></div><div class="field"><label for="np_mapa">Registro MAPA</label><input id="np_mapa" placeholder="CE 001014-6.000000" style="font-family:var(--mono)"></div><div class="field"><label for="np_cat">Categoria</label><select id="np_cat"><option>Orgânico</option><option>Convencional</option></select></div><button class="btn" type="submit">Adicionar produto</button></form>`}
-    <div class="tablebox"><table><thead><tr><th>Produto</th><th>Registro MAPA</th><th>Categoria</th><th>Par para reclassificação</th><th></th></tr></thead><tbody>
-    ${PRODS().map((p,i)=>`<tr class="row"><td class="prod">${esc(p.nome)}</td><td class="mono">${esc(p.mapa||"—")}</td><td>${esc(p.categoria||"")}</td><td>${p.categoria==="Orgânico"&&!ro?`<select class="parsel" data-i="${i}" aria-label="Par convencional de ${esc(p.nome)}" style="max-width:280px"><option value="">—</option>${PRODS().filter(x=>x.categoria==="Convencional").map(x=>`<option${x.nome===p.par?" selected":""}>${esc(x.nome)}</option>`).join("")}</select>`:`<span class="sub">${esc(p.par||"")}</span>`}</td><td><div class="rowacts">${ro?"":`<button class="btn sm" data-act="rmprod" data-i="${i}" aria-label="Remover ${esc(p.nome)}">Remover</button>`}</div></td></tr>`).join("")||`<tr><td colspan="5" class="muted">Nenhum produto cadastrado.</td></tr>`}
+    <p class="sub" style="margin:0">Ao escolher o produto no cadastro da amostra, o registro MAPA e o código interno são preenchidos sozinhos.</p>
+    ${(()=>{ if(ro) return ""; const c=codigosPendentes(); return c.prods.length||c.lotes.length?`<div class="banner" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between"><span><b>Códigos internos:</b> ${c.prods.length?`${c.prods.length} produto${c.prods.length===1?"":"s"} sem código ${c.prods.length===1?"tem":"têm"} o código na planilha de produtos`:"os produtos já têm código"}${c.lotes.length?` · ${c.lotes.length} lote${c.lotes.length===1?"":"s"} em estoque ${c.lotes.length===1?"fica":"ficam"} com o código do produto`:""}. Códigos já preenchidos não são alterados.</span><button class="btn primary sm" data-act="aplicarcod">Aplicar códigos</button></div>`:""; })()}
+    ${ro?"":`<form class="addprod toolbar"><div class="field grow"><label for="np_nome">Nome comercial</label><input id="np_nome" required></div><div class="field"><label for="np_mapa">Registro MAPA</label><input id="np_mapa" placeholder="CE 001014-6.000000" style="font-family:var(--mono)"></div><div class="field" style="flex:0 1 150px"><label for="np_cod">Código interno</label><input id="np_cod" inputmode="numeric" style="font-family:var(--mono)"></div><div class="field"><label for="np_cat">Categoria</label><select id="np_cat"><option>Orgânico</option><option>Convencional</option></select></div><button class="btn" type="submit">Adicionar produto</button></form>`}
+    <div class="tablebox"><table><thead><tr><th>Produto</th><th>Registro MAPA</th><th>Código interno</th><th>Categoria</th><th>Par para reclassificação</th><th></th></tr></thead><tbody>
+    ${PRODS().map((p,i)=>`<tr class="row"><td class="prod">${esc(p.nome)}</td><td class="mono">${esc(p.mapa||"—")}</td><td>${ro?`<span class="mono">${esc(p.codigo||"—")}</span>`:`<input class="codinp" data-i="${i}" value="${esc(p.codigo||"")}" inputmode="numeric" placeholder="—" aria-label="Código interno de ${esc(p.nome)}" style="width:96px;min-height:36px;font-family:var(--mono)">`}</td><td>${esc(p.categoria||"")}</td><td>${p.categoria==="Orgânico"&&!ro?`<select class="parsel" data-i="${i}" aria-label="Par convencional de ${esc(p.nome)}" style="max-width:280px"><option value="">—</option>${PRODS().filter(x=>x.categoria==="Convencional").map(x=>`<option${x.nome===p.par?" selected":""}>${esc(x.nome)}</option>`).join("")}</select>`:`<span class="sub">${esc(p.par||"")}</span>`}</td><td><div class="rowacts">${ro?"":`<button class="btn sm" data-act="rmprod" data-i="${i}" aria-label="Remover ${esc(p.nome)}">Remover</button>`}</div></td></tr>`).join("")||`<tr><td colspan="6" class="muted">Nenhum produto cadastrado.</td></tr>`}
     </tbody></table></div></div>
   <div class="lists">${LISTS.map(([k,t,d])=>`<div class="panel"><h2>${t} <small>${(S.cfg[k]||[]).length}</small></h2>${d?`<p class="sub" style="margin:0">${d}</p>`:""}
     <div class="chips">${(S.cfg[k]||[]).map((v,i)=>`<span class="chip">${esc(v)}${ro?"":`<button data-act="rmlist" data-k="${k}" data-i="${i}" aria-label="Remover ${esc(v)}">×</button>`}</span>`).join("")||`<span class="sub">Lista vazia.</span>`}</div>
@@ -1428,6 +1449,7 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="backup") backupJSON(b);
   else if(act==="instalar") instalarApp();
   else if(act==="evid") evidDetalhe(id);
+  else if(act==="aplicarcod") aplicarCodigos();
   else if(act==="local") mudarLocal([id]);
   else if(act==="mudarlocais") mudarLocal(null);
   else if(act==="skin"){ applySkin(b.dataset.v); refresh(true); toast("Tema: "+SKIN_INFO[b.dataset.v][0]); }
@@ -1454,9 +1476,9 @@ $("#main").addEventListener("click", async e=>{
 });
 $("#main").addEventListener("submit", async e=>{
   const fp=e.target.closest("form.addprod");
-  if(fp){ e.preventDefault(); const nome=$("#np_nome").value.trim(), mapa=$("#np_mapa").value.trim(), categoria=$("#np_cat").value; if(!nome) return;
+  if(fp){ e.preventDefault(); const nome=$("#np_nome").value.trim(), mapa=$("#np_mapa").value.trim(), codigo=$("#np_cod").value.trim(), categoria=$("#np_cat").value; if(!nome) return;
     if(PRODS().some(x=>norm(x.nome)===norm(nome))){ toast("Esse produto já está cadastrado."); return; }
-    const cfg={...S.cfg,produtos:[...PRODS(),{nome,mapa,categoria}].sort((a,b)=>a.nome.localeCompare(b.nome,"pt"))};
+    const cfg={...S.cfg,produtos:[...PRODS(),{nome,mapa,codigo,categoria}].sort((a,b)=>a.nome.localeCompare(b.nome,"pt"))};
     document.activeElement&&document.activeElement.blur(); await guard(()=>store.saveCfg(cfg),"Produto adicionado"); refresh(true); return; }
   const f=e.target.closest("form.addrow"); if(!f) return; e.preventDefault();
   const k=f.dataset.k, inp=f.querySelector("input"); const v=inp.value.trim(); if(!v) return;
@@ -1466,6 +1488,9 @@ $("#main").addEventListener("submit", async e=>{
 });
 $("#main").addEventListener("change", async e=>{ if(e.target.id==="impfile") lerImport(e.target.files[0]);
   if(e.target.id==="bkfile") importarBackup(e.target.files[0]);
+  if(e.target.classList&&e.target.classList.contains("codinp")){ const i=+e.target.dataset.i, v=e.target.value.trim(); const P=PRODS(); if(!P[i]||String(P[i].codigo||"")===v) return;
+    const dup=P.find((x,j)=>j!==i&&v&&String(x.codigo||"")===v);
+    await guard(()=>store.saveCfg({...S.cfg,produtos:P.map((x,j)=>j===i?{...x,codigo:v}:x)}),dup?`Código salvo (atenção: ${v} também está em ${dup.nome})`:"Código interno salvo"); }
   if(e.target.id==="cenaSel"){ LS.set("cena",e.target.value); aplicarCena(); toast("Animação: "+e.target.options[e.target.selectedIndex].text); }
   if(e.target.classList&&e.target.classList.contains("accsel")) await saveAcesso(e.target.dataset.uid,e.target.value);
   if(e.target.id==="accF"){ ACC_F=e.target.value; refresh(true); }
@@ -1506,9 +1531,8 @@ function formAmostra(a){
    <div class="field"><label for="a_cod">Código interno</label><input id="a_cod" value="${esc(a.codigo)}"></div>
    <div class="field"><label for="a_lote">Lote *</label><input id="a_lote" required value="${esc(a.lote)}" style="font-family:var(--mono)"></div>
    <div class="field"><label for="a_tipo">Tipo de amostra</label><select id="a_tipo">${opts(S.cfg.tipos,a.tipo)}</select></div>
-   <div class="field"><label for="a_cont">Conteúdo por unidade</label><input id="a_cont" value="${esc(a.conteudo)}" placeholder="ex.: 1 kg, 500 mL"></div>
    <div class="field"><label for="a_fab">Data de fabricação</label><input id="a_fab" type="date" value="${esc(a.fabricacao)}"></div>
-   <div class="field"><label for="a_val">Data de validade *</label><input id="a_val" type="date" required value="${esc(a.validade)}"></div>
+   <div class="field"><label for="a_val">Data de validade * <span class="thu" id="a_valhint"></span></label><input id="a_val" type="date" required value="${esc(a.validade)}"></div>
 
    <div class="field"><label for="a_un">Unidade</label><select id="a_un">${opts(S.cfg.unidades,a.unidade)}</select></div>
    <div class="field"><label for="a_loc">Localização</label><input id="a_loc" list="dll" value="${esc(a.local)}">${dl("dll",locs)}</div>
@@ -1521,7 +1545,14 @@ function formAmostra(a){
    <div class="formerr full" id="a_err"></div>`;
   const foot=`${ed?`<button type="button" class="btn danger" id="a_del" style="margin-right:auto">Excluir cadastro</button>`:""}<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">${ed?"Salvar alterações":"Cadastrar amostra"}</button>`;
   const m=modal(ed?"Editar amostra":"Nova amostra",body,foot,!ed);
-  m.ov.querySelector("#a_prod").addEventListener("input",ev=>{ const mp=mapaDe(ev.target.value); if(mp) m.ov.querySelector("#a_mapa").value=mp; });
+  m.ov.querySelector("#a_prod").addEventListener("input",ev=>{ const mp=mapaDe(ev.target.value); if(mp) m.ov.querySelector("#a_mapa").value=mp; const cd=codigoDe(ev.target.value); if(cd) m.ov.querySelector("#a_cod").value=cd; });
+  /* validade = fabricação + 2 anos (pode ser alterada à mão) */
+  const fabEl=m.ov.querySelector("#a_fab"), valEl=m.ov.querySelector("#a_val"), valHint=m.ov.querySelector("#a_valhint");
+  let valAuto = !valEl.value || valEl.value===mais2anos(fabEl.value);
+  const valSync=()=>{ if(valAuto){ const v=mais2anos(fabEl.value); if(v) valEl.value=v; } valHint.textContent=valAuto&&valEl.value?"(2 anos após a fabricação)":""; };
+  fabEl.addEventListener("input",valSync); fabEl.addEventListener("change",valSync);
+  valEl.addEventListener("input",()=>{ valAuto = valEl.value===mais2anos(fabEl.value); valHint.textContent=valAuto?"(2 anos após a fabricação)":"(alterada à mão)"; });
+  valSync();
   const NA=[{id:"",n:1,kg:""}];
   const naFmt=v=>v===""||v==null?"":String(v);
   const naSum=()=>{ const box=m.ov.querySelector("#na_sum"); if(!box) return; const ok=NA.filter(x=>x.id); const t=ok.reduce((s,x)=>s+(Number(x.n)||0),0), k=ok.reduce((s,x)=>s+(parseKg(String(x.kg))||0),0);
@@ -1551,7 +1582,7 @@ function formAmostra(a){
   if(ed) m.ov.querySelector("#a_del").onclick=()=>{ m.close(); confirmar("Excluir cadastro",`Apaga o lote ${a.lote} de ${a.produto} e todas as suas movimentações. Use só para cadastro feito por engano; para amostra usada ou vencida, registre a retirada ou o descarte.`,"Excluir",()=>guard(()=>store.deleteAmostra(a.id),"Cadastro excluído")); };
   m.form.onsubmit=async e=>{
     e.preventDefault(); const g=id=>m.ov.querySelector("#"+id).value.trim();
-    const d={produto:g("a_prod"),mapa:g("a_mapa"),codigo:g("a_cod"),lote:g("a_lote"),tipo:g("a_tipo"),conteudo:g("a_cont"),fabricacao:g("a_fab"),validade:g("a_val"),unidade:g("a_un"),local:g("a_loc"),responsavel:g("a_resp"),obs:g("a_obs")};
+    const d={produto:g("a_prod"),mapa:g("a_mapa"),codigo:g("a_cod"),lote:g("a_lote"),tipo:g("a_tipo"),conteudo:ed?(a.conteudo||""):"",fabricacao:g("a_fab"),validade:g("a_val"),unidade:g("a_un"),local:g("a_loc"),responsavel:g("a_resp"),obs:g("a_obs")};
     const err=m.ov.querySelector("#a_err");
     if(!d.produto||!d.lote||!d.validade){ err.textContent="Preencha produto, lote e data de validade."; return; }
     if(d.fabricacao&&d.validade<d.fabricacao){ err.textContent="A validade não pode ser anterior à fabricação."; return; }
@@ -1757,7 +1788,7 @@ function reclassificar(id){
         for(const x of moved){ if(ids.includes(x.i)){ qq[x.i]=((qq[x.i])||1)+x.n; kg[x.i]=Math.round(((Number(kg[x.i])||0)+x.kg)*1000)/1000; } else { ids.push(x.i); if(x.n>1) qq[x.i]=x.n; if(x.kg) kg[x.i]=x.kg; } }
         if(moved.length) await store.updateAmostra(destId,{ids,idsQ:qq,idsKg:kg,idsConf:d0.conf||"",atualizadoEm:data}); }
       else { const ids=moved.map(x=>x.i), qq={}, kg={}; moved.forEach(x=>{ if(x.n>1) qq[x.i]=x.n; if(x.kg) kg[x.i]=x.kg; });
-        destId=await store.addAmostra({produto:dest,mapa:mapaDe(dest),codigo:"",lote:r.lote,tipo:r.tipo||"",conteudo:r.conteudo||"",fabricacao:r.fabricacao||"",validade:r.validade||"",unidade:r.unidade||"un",local:r.local||"",responsavel:resp,
+        destId=await store.addAmostra({produto:dest,mapa:mapaDe(dest),codigo:codigoDe(dest),lote:r.lote,tipo:r.tipo||"",conteudo:r.conteudo||"",fabricacao:r.fabricacao||"",validade:r.validade||"",unidade:r.unidade||"un",local:r.local||"",responsavel:resp,
           obs:`Reclassificado de ${r.produto} (lote ${r.lote}) em ${fmtD(data)}.`,origemReclass:r.id,...(moved.length?{ids,idsQ:qq,idsKg:kg}:{})},0,resp,data); }
       // 2) movimentações ligadas
       const base={lote:r.lote,qtd,data,motivo:mot,responsavel:resp,ids:tok,kg:kgMov,...(cli?{clienteId:cli.id,cliente:cli.nome,clienteReclass:true}:{})};
