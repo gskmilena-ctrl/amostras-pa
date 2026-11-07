@@ -259,6 +259,8 @@ td>.rowacts{min-width:172px}
 .lchkbox{max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
 .lchk{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--line);cursor:pointer;font-size:13.5px}
 .lchk:first-child{border-top:0}
+.expopt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--surface)}
+.expopt:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--surface))}.expopt input{width:18px!important;height:18px!important;min-height:0!important;padding:0!important;margin:2px 0 0;flex:none;accent-color:var(--accent);box-shadow:none!important;border:0!important;background:none!important}
 .lchk input{width:18px;height:18px;min-height:0;flex:0 0 auto;accent-color:var(--accent)}
 /* ---------- Aparência ---------- */
 .skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -563,12 +565,12 @@ td>.rowacts{min-width:172px}
         <div class="tb-title"><div class="brand-mark" aria-hidden="true">AP</div><div class="tb-name"><b id="tbTitle">Painel</b><span id="tbSub">Amostras de Produto Acabado</span></div></div>
         <div class="actions">
           <button class="btn iconbtn mobonly" id="btnSkin" title="Trocar tema" aria-label="Trocar tema" style="font-size:18px">◐</button>
-          <button class="ibtn" id="ibExport" title="Exportar Excel" aria-label="Exportar Excel"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg></button>
+          <button class="ibtn" id="ibExport" title="Exportar Excel ou PDF" aria-label="Exportar Excel ou PDF"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg></button>
           <button class="ibtn" id="ibBell" title="Vencidas" aria-label="Ver vencidas"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="count cntVenc" hidden>0</span></button>
           <button class="ibtn" id="ibSkin" title="Trocar tema" aria-label="Trocar tema"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" style="fill:currentColor"/></svg></button>
           <button class="ibtn" id="ibSair" title="Sair" aria-label="Sair" hidden><svg viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg></button>
           <button class="btn iconbtn mobonly" id="btnSair2" title="Sair" aria-label="Sair" hidden style="font-size:16px">⏻</button>
-          <button class="btn" id="btnExport" title="Exportar para Excel">⭳ <span class="lbl">Exportar Excel</span></button>
+          <button class="btn" id="btnExport" title="Exportar relatório em Excel ou PDF">⭳ <span class="lbl">Exportar</span></button>
           <button class="btn" id="btnRetirar" title="Registrar retirada">− <span class="lbl">Registrar retirada</span></button>
           <button class="btn primary" id="btnNova" title="Nova amostra">+ <span class="lbl">Nova amostra</span></button>
         </div>
@@ -860,7 +862,7 @@ applySkin(LS.get("skin","ouro"));
 document.getElementById("skinSel").addEventListener("change",e=>applySkin(e.target.value));
 document.getElementById("ibSkin").addEventListener("click",()=>document.getElementById("btnSkin").click());
 document.getElementById("ibBell").addEventListener("click",()=>{ setTab("vencidas"); window.scrollTo(0,0); });
-document.getElementById("ibExport").addEventListener("click",()=>exportar());
+document.getElementById("ibExport").addEventListener("click",()=>exportMenu());
 document.getElementById("ibSair").addEventListener("click",()=>sairApp());
 window.matchMedia("(max-width:859px)").addEventListener("change",()=>render());
 document.getElementById("btnSkin").addEventListener("click",()=>{ const cur=LS.get("skin","ouro"); applySkin(SKINS[(SKINS.indexOf(cur)+1)%SKINS.length]); toast("Tema: "+document.querySelector(`#skinSel option[value="${LS.get("skin","ouro")}"]`).textContent); });
@@ -1602,7 +1604,7 @@ $("#main").addEventListener("change", async e=>{ if(e.target.id==="impfile") ler
   if(e.target.classList&&e.target.classList.contains("parsel")){ const i=+e.target.dataset.i; const L=PRODS().map(x=>({...x})); if(e.target.value) L[i].par=e.target.value; else delete L[i].par; await guard(()=>store.saveCfg({...S.cfg,produtos:L}),"Par salvo"); } });
 $("#btnNova").onclick=()=>formAmostra();
 $("#btnRetirar").onclick=()=>formMov(null,"saida");
-$("#btnExport").onclick=()=>exportar();
+$("#btnExport").onclick=()=>exportMenu();
 
 /* ======================= Modais ======================= */
 function modal(title, body, foot, wide){
@@ -2129,10 +2131,122 @@ async function doImport(){
 }
 
 /* ======================= Exportar ======================= */
+function exportMenu(){
+  const de0=hoje().slice(0,8)+"01";
+  const sec=[["res","Resumo do estoque",true],["est","Estoque atual (lotes com saldo, IDs e embalagens)",true],["ven","Vencidas e a vencer",true],["mov","Movimentações do período",true],["frac","Fracionamentos aguardando os frascos",true]];
+  const md=modal("Exportar relatório",`
+    <div class="full" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      <label class="expopt"><input type="radio" name="ex_fmt" value="pdf" checked><span><b>Relatório em PDF</b><br><span class="sub">Pronto para imprimir, arquivar ou enviar por e-mail</span></span></label>
+      <label class="expopt"><input type="radio" name="ex_fmt" value="xlsx"><span><b>Planilha Excel (.xlsx)</b><br><span class="sub">Todos os dados, em abas, para filtrar e calcular</span></span></label></div>
+    <div class="full" id="ex_pdfopts" style="display:flex;flex-direction:column;gap:10px">
+      <div><div class="sub" style="margin-bottom:6px">O que entra no PDF</div><div class="lchkbox" style="max-height:none">${sec.map(([k,l,on])=>`<label class="lchk"><input type="checkbox" id="ex_${k}"${on?" checked":""}><span>${l}</span></label>`).join("")}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label for="ex_de">Movimentações de</label><input id="ex_de" type="date" value="${de0}"></div><div class="field"><label for="ex_ate">até</label><input id="ex_ate" type="date" value="${hoje()}"></div></div>
+      <div class="field"><label for="ex_prod">Produto <span class="thu">opcional</span></label><input id="ex_prod" list="dlex" placeholder="Todos os produtos" autocomplete="off">${dl("dlex",S.amostras.map(a=>a.produto))}</div></div>
+    <div class="formerr full" id="ex_err"></div>`,
+    `<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary" id="ex_go">Baixar PDF</button>`);
+  const q=x=>md.ov.querySelector(x);
+  const sync=()=>{ const pdf=q('input[name="ex_fmt"]:checked').value==="pdf"; q("#ex_pdfopts").hidden=!pdf; q("#ex_go").textContent=pdf?"Baixar PDF":"Baixar Excel"; };
+  md.ov.querySelectorAll('input[name="ex_fmt"]').forEach(r=>r.addEventListener("change",sync)); sync();
+  md.form.onsubmit=e=>{ e.preventDefault(); const err=q("#ex_err");
+    if(q('input[name="ex_fmt"]:checked').value==="xlsx"){ md.close(); exportar(); return; }
+    const o={de:q("#ex_de").value,ate:q("#ex_ate").value,prod:q("#ex_prod").value.trim()}; sec.forEach(([k])=>o[k]=q("#ex_"+k).checked);
+    if(!sec.some(([k])=>o[k])){ err.textContent="Marque pelo menos uma parte do relatório."; return; }
+    if(o.mov&&o.de&&o.ate&&o.ate<o.de){ err.textContent="A data final do período é anterior à inicial."; return; }
+    md.close(); gerarPDF(o); };
+}
+const PDF_LIBS=["https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js","https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"];
+const loadScript=src=>new Promise((ok,ko)=>{ const t=document.createElement("script"); t.src=src; t.onload=ok; t.onerror=ko; document.head.appendChild(t); });
+async function gerarPDF(o){
+  toast("Gerando o PDF…");
+  try{ if(!window.jspdf) await loadScript(PDF_LIBS[0]); if(!window.jspdf.jsPDF.API.autoTable) await loadScript(PDF_LIBS[1]); }
+  catch(e){ toast("O gerador de PDF não carregou. Confira a internet e tente de novo."); return; }
+  try{
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+  const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=10;
+  const C={ink:[15,30,54],acc:[29,90,150],mut:[107,122,140],line:[214,222,232],zeb:[245,247,250],bad:[183,45,35],warn:[166,104,0],ok:[46,125,50],gold:[245,197,24]};
+  const pf=o.prod?norm(o.prod):""; const okP=x=>!pf||norm(x.produto).includes(pf);
+  const R=rows().filter(okP); const ativas=R.filter(r=>r.saldo>0&&!r.descartada).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(a.validade).localeCompare(String(b.validade)));
+  const per=m=>(!o.de||String(m.data)>=o.de)&&(!o.ate||String(m.data)<=o.ate);
+  const MV=S.movs.filter(m=>okP(m)&&per(m)).sort((a,b)=>String(a.data).localeCompare(String(b.data))||String(a.criadoEm).localeCompare(String(b.criadoEm)));
+  const per_txt=`${o.de?fmtD(o.de):"início"} a ${o.ate?fmtD(o.ate):"hoje"}`;
+  const top=30; let y=top;
+  const T=(txt,x,yy,sz,col,bold,al)=>{ doc.setFont("helvetica",bold?"bold":"normal"); doc.setFontSize(sz); doc.setTextColor(...col); doc.text(String(txt),x,yy,al?{align:al}:undefined); };
+  const titulo=(t,sub)=>{ if(y>H-45){ doc.addPage(); y=top; } T(t,M,y,12.5,C.ink,true); if(sub) T(sub,M,y+5,8.5,C.mut,false); y+=sub?9:5; };
+  const tabela=(head,body,colStyles,extra)=>{ doc.autoTable({head:[head],body:body.length?body:[[{content:"Sem registros.",colSpan:head.length,styles:{textColor:C.mut,fontStyle:"italic"}}]],startY:y,margin:{top:top,bottom:16,left:M,right:M},rowPageBreak:"avoid",
+      theme:"grid",styles:{font:"helvetica",fontSize:7.6,cellPadding:1.5,textColor:C.ink,lineColor:C.line,lineWidth:0.15,valign:"middle",overflow:"linebreak"},
+      headStyles:{fillColor:C.ink,textColor:255,fontStyle:"bold",fontSize:7.8},alternateRowStyles:{fillColor:C.zeb},columnStyles:colStyles||{},...(extra||{})});
+    y=doc.lastAutoTable.finalY+10; };
+  const stCor=st=>st==="vencida"?C.bad:st==="avencer"?C.warn:st==="ok"?C.ok:C.mut;
+
+  if(o.res){
+    titulo("Resumo do estoque",`Situação em ${fmtD(hoje())}${o.prod?` · produto: ${o.prod}`:""}`);
+    const un=ativas.reduce((s,r)=>s+r.saldo,0), kg=ativas.reduce((s,r)=>s+kgOf(r),0);
+    const ent=MV.filter(m=>m.tipo==="entrada"&&ATIVA(m)), sai=MV.filter(m=>(m.tipo==="saida"||m.tipo==="descarte")&&ATIVA(m));
+    const K=[["Lotes em estoque",nf(ativas.length),C.acc],["Unidades em estoque",nf(un),C.acc],["Peso em estoque",fkg(kg)+" kg",C.acc],["A vencer",nf(ativas.filter(r=>r.st==="avencer").length),C.warn,`em até ${S.cfg.alerta||60} dias`],["Vencidas com saldo",nf(ativas.filter(r=>r.st==="vencida").length),C.bad],
+      ...(o.mov?[["Entradas no período",nf(ent.reduce((s,m)=>s+(Number(m.qtd)||0),0))+" un",C.ok,per_txt],["Saídas no período",nf(sai.reduce((s,m)=>s+(Number(m.qtd)||0),0))+" un",C.ink,fkg(sai.reduce((s,m)=>s+(Number(m.kg)||0),0))+" kg"]]:[])];
+    const g=3, bw=(W-2*M-g*(K.length-1))/K.length, bh=19;
+    K.forEach(([l,v,c,sub],i)=>{ const x=M+i*(bw+g); doc.setFillColor(...C.zeb); doc.setDrawColor(...C.line); doc.roundedRect(x,y,bw,bh,2,2,"FD"); doc.setFillColor(...c); doc.rect(x,y+3,1.2,bh-6,"F");
+      T(l,x+4,y+5.5,7.4,C.mut,false); T(v,x+4,y+12.5,v.length>9?11:14,C.ink,true); if(sub) T(sub,x+4,y+16.8,6.6,C.mut,false); });
+    y+=bh+8;
+    if(o.mov){ const cats={}; MV.filter(m=>(m.tipo==="saida"||m.tipo==="descarte")&&ATIVA(m)).forEach(m=>{ const c=m.fracId?"Fracionamento (lab. interno)":catOf(m)||"Outras saídas"; const x=cats[c]=cats[c]||{n:0,q:0,kg:0}; x.n++; x.q+=Number(m.qtd)||0; x.kg+=Number(m.kg)||0; });
+      const L=Object.entries(cats).sort((a,b)=>b[1].q-a[1].q);
+      if(L.length){ T(`Saídas por tipo · ${per_txt}`,M,y,9.5,C.ink,true); y+=3;
+        tabela(["Tipo de saída","Lançamentos","Unidades","Peso (kg)"],L.map(([c,x])=>[c,nf(x.n),nf(x.q),fkg(x.kg)]),{1:{halign:"right",cellWidth:30},2:{halign:"right",cellWidth:30},3:{halign:"right",cellWidth:30}},{tableWidth:170}); } }
+  }
+  if(o.est){
+    titulo("Estoque atual",`${ativas.length} lote${ativas.length===1?"":"s"} com saldo · IDs com embalagem e peso`);
+    tabela(["Produto","Lote","Tipo","Validade","Situação","Saldo","Peso (kg)","Local","IDs em estoque"],
+      ativas.map(r=>{ const io=idsOf(r); return [r.produto,r.lote,r.tipo||"",fmtD(r.validade),ST_LABEL[r.st]||"",`${nf(r.saldo)} ${r.unidade||"un"}`,fkg(kgOf(r)),r.local||"",io.ids.map(i=>idLabel(i,io.q,io.kg,io.emb)).join("; ")]; }),
+      {0:{cellWidth:58},1:{cellWidth:20,fontStyle:"bold"},2:{cellWidth:24},3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:16,halign:"right"},6:{cellWidth:17,halign:"right"},7:{cellWidth:28},8:{cellWidth:"auto",fontSize:6.8}},
+      {didParseCell:d=>{ if(d.section==="body"&&d.column.index===4){ const r=ativas[d.row.index]; if(r){ d.cell.styles.textColor=stCor(r.st); d.cell.styles.fontStyle="bold"; } } }});
+  }
+  if(o.ven){
+    const V=ativas.filter(r=>r.st==="vencida"||r.st==="avencer").sort((a,b)=>String(a.validade).localeCompare(String(b.validade)));
+    titulo("Vencidas e a vencer",`Lotes com saldo vencidos ou que vencem em até ${S.cfg.alerta||60} dias`);
+    tabela(["Produto","Lote","Validade","Prazo","Saldo","Peso (kg)","Local","Situação"],
+      V.map(r=>[r.produto,r.lote,fmtD(r.validade),r.dias<0?`vencida há ${-r.dias} d`:r.dias===0?"vence hoje":`vence em ${r.dias} d`,`${nf(r.saldo)} ${r.unidade||"un"}`,fkg(kgOf(r)),r.local||"",ST_LABEL[r.st]||""]),
+      {0:{cellWidth:80},1:{cellWidth:24,fontStyle:"bold"},2:{cellWidth:22},3:{cellWidth:30},4:{cellWidth:20,halign:"right"},5:{cellWidth:20,halign:"right"}},
+      {didParseCell:d=>{ if(d.section==="body"&&(d.column.index===7||d.column.index===3)){ const r=V[d.row.index]; if(r){ d.cell.styles.textColor=stCor(r.st); d.cell.styles.fontStyle="bold"; } } }});
+  }
+  if(o.mov){
+    titulo("Movimentações do período",`${per_txt} · ${MV.length} lançamento${MV.length===1?"":"s"}`);
+    const sit=m=>m.status==="pendente"?"Aguardando":m.status==="recusada"?"Recusada":"Confirmada";
+    tabela(["Data","Tipo","Produto","Lote","Qtd","Tipo de saída / motivo","Destino","ID(s)","Peso (kg)","Responsável","Situação","Observação"],
+      MV.map(m=>{ const out=m.tipo==="saida"||m.tipo==="descarte"; const sg=(m.tipo==="entrada"||m.tipo==="reclass_in"||(m.tipo==="ajuste"&&m.qtd>0))?"+":Number(m.qtd)===0?"":"-";
+        return [fmtD(m.data),MV_LABEL[m.tipo]||m.tipo,m.produto,m.lote,sg+nf(Math.abs(Number(m.qtd)||0)),[out?(m.fracId?"Fracionamento":catOf(m)):"",m.motivo&&m.motivo!=="Fracionamento"?m.motivo:""].filter(Boolean).join(" · "),m.cliente||m.destino||"",m.ids||"",m.kg?fkg(Number(m.kg)):"",m.responsavel||"",sit(m),String(m.obs||"").slice(0,140)]; }),
+      {0:{cellWidth:17},1:{cellWidth:18},2:{cellWidth:44},3:{cellWidth:17,fontStyle:"bold"},4:{cellWidth:11,halign:"right"},5:{cellWidth:30},6:{cellWidth:22},7:{cellWidth:28,fontSize:6.6},8:{cellWidth:14,halign:"right"},9:{cellWidth:20},10:{cellWidth:17},11:{cellWidth:"auto",fontSize:6.6}},
+      {didParseCell:d=>{ if(d.section!=="body") return; const m=MV[d.row.index]; if(!m) return;
+        if(d.column.index===1) d.cell.styles.textColor=m.tipo==="entrada"||m.tipo==="reclass_in"?C.ok:m.tipo==="descarte"?C.bad:C.acc;
+        if(d.column.index===10&&m.status&&m.status!=="confirmada"){ d.cell.styles.textColor=m.status==="recusada"?C.bad:C.warn; d.cell.styles.fontStyle="bold"; } }});
+  }
+  if(o.frac){
+    const F=fracAbertos().filter(okP);
+    titulo("Fracionamentos aguardando os frascos","Volumes abertos para o laboratório interno cujo retorno em frascos ainda não foi registrado");
+    tabela(["Data","Produto","Lote","Volume aberto","Peso aberto (kg)","Responsável","Situação"],
+      F.map(m=>[fmtD(m.data),m.produto,m.lote,m.ids||nf(m.qtd),m.kg?fkg(Number(m.kg)):"",m.responsavel||"",m.status==="pendente"?"Aguardando confirmação":"Confirmada"]),
+      {0:{cellWidth:20},1:{cellWidth:80},2:{cellWidth:24,fontStyle:"bold"},4:{halign:"right"}});
+  }
+  /* cabeçalho e rodapé em todas as páginas */
+  const lg=document.querySelector(".wlogo"); const logo=lg&&lg.src&&lg.src.startsWith("data:image")?lg.src:null;
+  const n=doc.getNumberOfPages(); const agora=new Date(); const quando=`${fmtD(hoje())} às ${String(agora.getHours()).padStart(2,"0")}:${String(agora.getMinutes()).padStart(2,"0")}`;
+  for(let i=1;i<=n;i++){ doc.setPage(i);
+    if(logo){ try{ doc.addImage(logo,"PNG",M,6,15,15); }catch(e){} }
+    const tx=logo?M+19:M;
+    T("Relatório de Amostras de Produto Acabado",tx,12,14,C.ink,true);
+    T(`Controle de Qualidade · Meri Pobo${o.prod?` · produto: ${o.prod}`:""}`,tx,17.5,8.5,C.mut,false);
+    T(`Gerado em ${quando}`,W-M,12,8,C.mut,false,"right"); if(S.myName||S.myId) T(`por ${S.myName||S.myId}`,W-M,16.5,8,C.mut,false,"right");
+    doc.setFillColor(...C.gold); doc.rect(M,22,W-2*M,0.9,"F");
+    doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.line(M,H-10,W-M,H-10);
+    T("App Amostras PA · gskmilena-ctrl.github.io/amostras-pa",M,H-5.5,7,C.mut,false);
+    T(`Página ${i} de ${n}`,W-M,H-5.5,7,C.mut,false,"right"); }
+  const fname=`Relatorio_Amostras_PA_${hoje().split("-").reverse().join(".")}.pdf`;
+  await DL.save({filename:fname,data:doc.output("blob")}); toast("Relatório em PDF baixado");
+  }catch(e){ console.error(e); toast("Não foi possível gerar o PDF agora."); }
+}
 async function exportar(){
   if(!window.XLSX){ toast("O gerador de Excel não carregou. Recarregue a página."); return; }
   const R=rows().sort((a,b)=>a.produto.localeCompare(b.produto,"pt"));
-  const est=R.map(r=>({"Produto":r.produto,"Registro MAPA":r.mapa||"","Código interno":r.codigo||"","Lote":r.lote,"Tipo":r.tipo||"","Conteúdo/unid.":r.conteudo||"","Fabricação":fmtD(r.fabricacao),"Validade":fmtD(r.validade),"Dias p/ vencer":r.dias??"","Situação":ST_LABEL[r.st],"Saldo":r.saldo,"Unidade":r.unidade||"","Localização":r.local||"","Peso em estoque (kg)":r.saldo>0&&!r.descartada?Math.round(kgOf(r)*1000)/1000:0,"IDs em estoque":idsOf(r).ids.map(i=>idLabel(i,idsOf(r).q,idsOf(r).kg)).join(", "),"Última atualização":fmtD(r.atual),"Responsável":r.respUlt,"Observação":r.obs||""}));
+  const est=R.map(r=>({"Produto":r.produto,"Registro MAPA":r.mapa||"","Código interno":r.codigo||"","Lote":r.lote,"Tipo":r.tipo||"","Conteúdo/unid.":r.conteudo||"","Fabricação":fmtD(r.fabricacao),"Validade":fmtD(r.validade),"Dias p/ vencer":r.dias??"","Situação":ST_LABEL[r.st],"Saldo":r.saldo,"Unidade":r.unidade||"","Localização":r.local||"","Peso em estoque (kg)":r.saldo>0&&!r.descartada?Math.round(kgOf(r)*1000)/1000:0,"IDs em estoque":idsOf(r).ids.map(i=>idLabel(i,idsOf(r).q,idsOf(r).kg,idsOf(r).emb)).join("; "),"Última atualização":fmtD(r.atual),"Responsável":r.respUlt,"Observação":r.obs||""}));
   const mv=S.movs.slice().sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(m=>({"Data":fmtD(m.data),"Mês":m.data?`${MES[+m.data.slice(5,7)-1]}${m.data.slice(0,4)}`:"","Tipo":MV_LABEL[m.tipo]||m.tipo,"Produto":m.produto,"Lote":m.lote,"Quantidade":m.qtd,"Tipo de saída":(m.tipo==="saida"||m.tipo==="descarte")?catOf(m):"","Motivo":m.motivo||"","Destino":m.cliente||m.destino||"","ID(s)":m.ids||"","Peso (kg)":m.kg||"","Responsável":m.responsavel||"","Observação":m.obs||"","Fotos":m.fotos||0,"Situação":m.status==="pendente"?"Aguardando confirmação":m.status==="recusada"?"Recusada":"Confirmada","Lançado por":m.porNome||m.por||"","Confirmado/recusado por":m.confirmadoNome||m.confirmadoPor||m.recusadoNome||m.recusadoPor||"","Motivo da recusa":m.recusaMotivo||""}));
   const wb=XLSX.utils.book_new();
   const add=(name,data,cols)=>{ const ws=XLSX.utils.json_to_sheet(data.length?data:[{"":"Sem registros"}]); ws["!cols"]=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,ws,name); };
