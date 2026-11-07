@@ -237,8 +237,15 @@ td>.rowacts{min-width:172px}
 .obsc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:520px}
 .thu{font-size:10.5px;font-weight:600;color:var(--dim);text-transform:none;letter-spacing:0}
 .na-rows input{min-height:40px}
-.na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}
-@media (max-width:600px){.na-rows td,.na-rows th{padding:6px 4px}.na-rows .na_id{width:84px}.na-rows .na_n{width:54px}.na-rows .na_kg{width:86px}.na-rows input{padding-left:8px;padding-right:8px}.na-rows .na_rm{padding:0 8px;min-height:40px}}
+.na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}.na-rows .na_emb{width:160px;min-height:40px}
+.frbal{background:var(--sunk);border-radius:10px;padding:10px 14px;font-size:13.5px;display:flex;gap:6px 18px;flex-wrap:wrap}.frbal b{font-family:var(--mono)}
+.fropen{border:1px solid var(--warn);border-radius:10px;padding:10px 12px;display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;background:color-mix(in srgb,var(--warn) 8%,transparent)}
+@media (max-width:600px){.na-rows td,.na-rows th{padding:6px 4px}.na-rows .na_id{width:84px}.na-rows .na_n{width:54px}.na-rows .na_kg{width:86px}.na-rows .na_emb{width:108px;padding-left:6px;padding-right:2px;font-size:13px}.na-rows input{padding-left:8px;padding-right:8px}.na-rows .na_rm{padding:0 8px;min-height:40px}}
+@media (max-width:600px){.na-rows thead tr,.na-rows tbody tr{display:grid;grid-template-columns:minmax(0,1fr) 58px 92px 40px;grid-template-areas:"id n kg rm" "emb emb emb rm";gap:6px;padding:8px 6px;align-items:center}
+.na-rows thead tr{padding-bottom:0}.na-rows td,.na-rows th{display:block;padding:0!important;border:0!important}
+.na-rows tr>:nth-child(1){grid-area:id}.na-rows tr>:nth-child(2){grid-area:emb}.na-rows tr>:nth-child(3){grid-area:n}.na-rows tr>:nth-child(4){grid-area:kg}.na-rows tr>:nth-child(5){grid-area:rm}
+.na-rows thead th:nth-child(2){display:none}.na-rows tbody tr{border-top:1px solid var(--line)}
+.na-rows .na_id,.na-rows .na_n,.na-rows .na_kg,.na-rows .na_emb{width:100%!important}.na-rows .na_emb{font-size:14px}}
 .na-tot{display:flex;gap:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:8px}
 .fieldbox{min-height:44px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);font-weight:700;line-height:1.35}
 .lotsug{border:1px solid var(--line2);border-radius:12px;background:var(--surface);max-height:300px;overflow-y:auto;margin-top:-6px}
@@ -590,7 +597,8 @@ const DEFAULT_CFG = {
   tipos: ["Retenção (contraprova)","Análise","Estabilidade","Cliente / comercial","Reclamação"],
   motivos: ["Análise de rotina","Análise de reclamação","Análise externa (laboratório)","Envio a cliente","Estudo de estabilidade","Auditoria / fiscalização","Descarte – vencida","Descarte – avariada","Outro"],
   unidades: ["un","fr","cx","pct","kg","g","L","mL"],
-  motivosReclass: ["Solicitação do cliente","Acordo comercial","Perda de certificação orgânica","Outro"]
+  motivosReclass: ["Solicitação do cliente","Acordo comercial","Perda de certificação orgânica","Outro"],
+  embalagens: ["Saco valvulado","Frasco 0,250 kg","Frasco 0,350 kg","Pote 250 mL","Pote 500 mL"]
 };
 const S = { role:"total", isOwner:false, myId:null, canW:null, acessos:{}, pessoas:[], amostras:[], movs:[], hist:[], clientes:[], envh:[], envIds:{}, stkIds:{}, stkKg:{}, envKg:{}, fc:{q:"",pais:"",tipo:""}, cfg:{...DEFAULT_CFG}, mode:"loading", tab:"painel", readonly:false,
   f:{ q:"", status:"ativas", local:"", tipo:"", sort:"validade" },
@@ -679,13 +687,13 @@ function rows(){
 /* Retiradas usadas nas médias: lançamentos do app + histórico mensal importado da planilha */
 function saidasAll(){
   const h=S.hist.map(x=>({produto:x.produto,data:(x.mes||"")+"-01",qtd:Number(x.qtd)||0,hist:true}));
-  return [...S.movs.filter(m=>m.tipo==="saida"&&ATIVA(m)), ...h];
+  return [...S.movs.filter(m=>m.tipo==="saida"&&ATIVA(m)&&!m.fracId), ...h];
 }
 /* IDs (posições) em estoque de cada lote: campo do próprio lote, ou o levantamento importado da planilha */
 function idsOf(a){
-  if(!a) return {ids:[],q:{},conf:"",kg:{}};
-  if(Array.isArray(a.ids)) return {ids:a.ids,q:a.idsQ||{},conf:a.idsConf||"",kg:a.idsKg||{}};
-  const m=S.stkIds[a.id]; return m?{ids:m.ids||[],q:m.q||{},conf:m.conf||"",kg:S.stkKg[a.id]||{}}:{ids:[],q:{},conf:"",kg:{}};
+  if(!a) return {ids:[],q:{},conf:"",kg:{},emb:{}};
+  if(Array.isArray(a.ids)) return {ids:a.ids,q:a.idsQ||{},conf:a.idsConf||"",kg:a.idsKg||{},emb:a.idsEmb||{}};
+  const m=S.stkIds[a.id]; return m?{ids:m.ids||[],q:m.q||{},conf:m.conf||"",kg:S.stkKg[a.id]||{},emb:{}}:{ids:[],q:{},conf:"",kg:{},emb:{}};
 }
 const kgOf = a=>{ const io=idsOf(a); return io.ids.reduce((s,i)=>s+(Number(io.kg[i])||0),0); };
 const fkg = v=>(Math.round(v*1000)/1000).toLocaleString("pt-BR",{minimumFractionDigits:v>=100?1:3,maximumFractionDigits:3});
@@ -697,7 +705,91 @@ function parseKg(t){
     if(!/^-?\d*\.?\d+$/.test(x)) return null; const v=Number(x); if(!(v>=0)) return null; sum+=v; }
   return Math.round(sum*1000)/1000;
 }
-const idLabel = (i,q,kg)=>(q&&q[i]>1?`${i}×${q[i]}`:i)+(kg&&kg[i]?` · ${fkg(kg[i])} kg`:"");
+const idLabel = (i,q,kg,emb)=>{ const e=emb&&emb[i]; const n=q&&q[i]>1?q[i]:0; return (e?`${baseId(i,e)} · ${e}${n?` ×${n}`:""}`:(n?`${i}×${n}`:i))+(kg&&kg[i]?` · ${fkg(kg[i])} kg`:""); };
+/* Embalagens: o mesmo ID pode existir em embalagens diferentes (ex.: saco valvulado A5 e frascos A5). */
+const EMB=()=>(S.cfg.embalagens&&S.cfg.embalagens.length?S.cfg.embalagens:DEFAULT_CFG.embalagens);
+const embPadrao=()=>EMB().find(x=>/saco/i.test(x))||EMB()[0]||"";
+const embOpts=v=>`<option value="">—</option>`+[...EMB(),...(v&&!EMB().includes(v)?[v]:[])].map(x=>`<option${x===v?" selected":""}>${esc(x)}</option>`).join("");
+const baseId=(k,e)=>{ for(const t of [e,"sem embalagem"]){ if(t&&k.endsWith(` (${t})`)) return k.slice(0,-(t.length+3)); } return k; };
+const r3=v=>Math.round(v*1000)/1000;
+const linhaTxt=x=>`${x.id}${x.n>1?"x"+x.n:""}${x.emb?" ("+x.emb+")":""}`;
+/* junta as linhas (ID, embalagem, volumes, kg) ao estado de IDs do lote. Chave = ID; se o mesmo ID já existe
+   (ou aparece nas linhas) com outra embalagem, a chave vira "ID (embalagem)". Mesmo ID + mesma embalagem soma. */
+function entrarLinhas(st,L){
+  const keyFor=(id,e)=>{ const same=st.ids.find(k=>baseId(k,st.emb[k])===id&&(st.emb[k]||"")===(e||"")); if(same) return same;
+    const clash=st.ids.some(k=>baseId(k,st.emb[k])===id)||L.some(x=>x.id===id&&(x.emb||"")!==(e||""));
+    return clash?`${id} (${e||"sem embalagem"})`:id; };
+  for(const x of L){ const k=keyFor(x.id,x.emb), n=Number(x.n)||1, kg=Number(x.kg)||0;
+    if(st.ids.includes(k)){ st.q[k]=((st.q[k])||1)+n; st.kg[k]=r3((Number(st.kg[k])||0)+kg); if(!st.kg[k]) delete st.kg[k]; }
+    else { st.ids.push(k); if(n>1) st.q[k]=n; if(kg) st.kg[k]=r3(kg); }
+    if(!(st.q[k]>1)) delete st.q[k];
+    if(x.emb) st.emb[k]=x.emb; else delete st.emb[k]; }
+  return st;
+}
+/* resultado do "plano" de um lançamento sobre os IDs do lote (sem gravar) */
+function aplicarPlano(io,m){
+  const P=m.plano||{}; const st={ids:[...io.ids],q:{...io.q},kg:{...io.kg},emb:{...(io.emb||{})}}; let changed=false;
+  const un=i=>(io.q&&io.q[i])||1; const ku=i=>(Number(io.kg[i])||0)/un(i);
+  if(m.tipo==="entrada"){ if(P.rows&&P.rows.length){ entrarLinhas(st,P.rows); changed=true; }
+    else for(const i of (P.typed||[])){ if(!st.ids.includes(i)) st.ids.push(i); if(P.ku) st.kg[i]=P.ku; changed=true; } }
+  else { const sel=P.sel||{}; const keys=Object.keys(sel).filter(i=>io.ids.includes(i)); const est=keys.reduce((s,i)=>s+ku(i)*Math.min(un(i),sel[i]),0);
+    for(const i of keys){ const n=Math.min(un(i),Number(sel[i])||0), k0=Number(st.kg[i])||0;
+      const share=P.kgVal!=null?(est>0?P.kgVal*(ku(i)*n)/est:P.kgVal/keys.length):ku(i)*n;
+      if(n>=un(i)){ st.ids=st.ids.filter(x=>x!==i); delete st.q[i]; delete st.kg[i]; delete st.emb[i]; }
+      else { const rest=un(i)-n; if(rest>1) st.q[i]=rest; else delete st.q[i]; st.kg[i]=Math.max(0,r3(k0-share)); }
+      changed=true; } }
+  return changed?st:null;
+}
+const patchIds=(st,conf,data)=>({ids:st.ids,idsQ:st.q,idsKg:st.kg,idsEmb:st.emb,idsConf:conf||"",atualizadoEm:data||hoje()});
+/* fracionamentos (saco aberto no laboratório) cujos frascos ainda não voltaram */
+function fracAbertos(aid){ return S.movs.filter(m=>(!aid||m.amostraId===aid)&&m.fracId&&m.tipo!=="entrada"&&m.status!=="recusada"&&!m.fracFechado&&!S.movs.some(e=>e.tipo==="entrada"&&e.fracId===m.fracId&&e.status!=="recusada")).sort((a,b)=>String(b.data).localeCompare(String(a.data))); }
+const rowsHead=()=>`<thead><tr><th>ID</th><th>Embalagem</th><th class="num">Volumes<br><span class="thu">un</span></th><th class="num">Peso total<br><span class="thu">kg</span></th><th></th></tr></thead>`;
+const rowsBox=(pfx,add)=>`<div class="tablebox"><table class="na-rows">${rowsHead()}<tbody id="${pfx}_rows"></tbody></table></div><div class="na-tot"><button type="button" class="btn sm" id="${pfx}_add">${add}</button><div class="sub" id="${pfx}_sum"></div></div>`;
+/* editor de linhas ID · embalagem · volumes · peso (cadastro, entrada e fracionamento) */
+function rowEditor(root,pfx,o){
+  o=o||{}; const L=[{id:o.id0||"",emb:o.emb0||"",n:1,kg:""}]; let ready=false;
+  const tb=root.querySelector(`#${pfx}_rows`), sum=root.querySelector(`#${pfx}_sum`), add=root.querySelector(`#${pfx}_add`);
+  const blank=()=>({id:"",emb:(L.length?L[L.length-1].emb:o.emb0)||"",n:1,kg:""});
+  const tot=()=>{ const ok=L.filter(x=>x.id); return {n:ok.reduce((s,x)=>s+(Number(x.n)||0),0),kg:r3(ok.reduce((s,x)=>s+(parseKg(String(x.kg))||0),0))}; };
+  const showSum=()=>{ const t=tot(); if(sum) sum.innerHTML=`${o.sumLabel||"Quantidade"}: <b>${t.n}</b> ${esc((o.un&&o.un())||"un")} · peso total <b>${fkg(t.kg)}</b> kg`; if(o.onChange&&ready) o.onChange(t); };
+  const draw=fk=>{ tb.innerHTML=L.map((x,k)=>`<tr><td><input class="na_id" data-k="${k}" value="${esc(x.id)}" placeholder="ex.: A41" aria-label="ID da amostra ${k+1}" style="font-family:var(--mono);text-transform:uppercase"></td>
+      <td><select class="na_emb" data-k="${k}" aria-label="Embalagem da amostra ${k+1}">${embOpts(x.emb)}</select></td>
+      <td class="num"><input class="na_n" data-k="${k}" type="number" min="1" step="1" value="${x.n}" aria-label="Volumes da amostra ${k+1}" style="text-align:right"></td>
+      <td class="num"><input class="na_kg" data-k="${k}" inputmode="decimal" value="${esc(x.kg==null?"":String(x.kg))}" placeholder="0,000" aria-label="Peso total da amostra ${k+1} em kg" style="text-align:right;font-family:var(--mono)"></td>
+      <td><button type="button" class="btn sm na_rm" data-k="${k}" aria-label="Remover linha ${k+1}"${L.length===1?" disabled":""}>×</button></td></tr>`).join("");
+    showSum(); if(fk!=null){ const f=tb.querySelector(`.na_id[data-k="${fk}"]`); if(f) f.focus(); } };
+  const embDe=t=>{ const n=norm(t); return EMB().find(x=>norm(x)===n)||t; };
+  add.onclick=()=>{ L.push(blank()); draw(L.length-1); };
+  tb.addEventListener("input",ev=>{ const t=ev.target, k=+t.dataset.k; if(!L[k]) return;
+    if(t.classList.contains("na_id")) L[k].id=t.value.trim().toUpperCase(); else if(t.classList.contains("na_n")) L[k].n=parseInt(t.value)||0; else if(t.classList.contains("na_kg")) L[k].kg=t.value; showSum(); });
+  tb.addEventListener("change",ev=>{ const t=ev.target, k=+t.dataset.k; if(t.classList.contains("na_emb")&&L[k]){ L[k].emb=t.value; showSum(); } });
+  tb.addEventListener("click",ev=>{ const b=ev.target.closest(".na_rm"); if(!b) return; ev.preventDefault(); L.splice(+b.dataset.k,1); if(!L.length) L.push(blank()); draw(); });
+  tb.addEventListener("keydown",ev=>{ if(ev.key!=="Enter") return; const t=ev.target; if(!t.matches(".na_id,.na_n,.na_kg,.na_emb")) return; ev.preventDefault();
+    const k=+t.dataset.k; if(t.classList.contains("na_id")||t.classList.contains("na_emb")){ const nx=tb.querySelector(`.na_kg[data-k="${k}"]`); nx&&nx.focus(); return; }
+    if(k===L.length-1){ L.push(blank()); draw(L.length-1); } else { const f=tb.querySelector(`.na_id[data-k="${k+1}"]`); f&&f.focus(); } });
+  tb.addEventListener("paste",ev=>{ const t=ev.target; if(!t.classList.contains("na_id")) return; const txt=(ev.clipboardData||window.clipboardData).getData("text"); if(!/[\t\n;]/.test(txt.trim())) return;
+    ev.preventDefault(); const k=+t.dataset.k; let prev=L[k].emb||o.emb0||"";
+    const lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/\t|;/).map(c=>c.trim()));
+    const isN=v=>/^\d+$/.test(String(v||"").trim());
+    const novos=lines.filter(c=>c[0]&&!/^id$/i.test(c[0])).map(c=>{ let x;
+      if(c.length>=4) x={id:c[0],emb:embDe(c[1]),n:parseInt(c[2])||1,kg:c[3]};
+      else if(c.length===3) x=isN(c[1])?{id:c[0],emb:prev,n:parseInt(c[1])||1,kg:c[2]}:{id:c[0],emb:embDe(c[1]),n:1,kg:c[2]};
+      else x={id:c[0],emb:prev,n:1,kg:c[1]||""};
+      x.id=x.id.toUpperCase(); prev=x.emb; return x; });
+    if(!novos.length) return; const vazio=!L[k].id&&!String(L[k].kg).trim(); L.splice(vazio?k:k+1,vazio?1:0,...novos); draw(); toast(`${novos.length} linha${novos.length===1?"":"s"} colada${novos.length===1?"":"s"}`); });
+  /* valida e devolve as linhas prontas: {id, emb, n, kg} */
+  const validate=()=>{ const V=L.filter(x=>x.id||String(x.kg).trim()); const out=[], seen={};
+    for(const [k,x] of V.entries()){ if(!x.id) return {err:`A linha ${k+1} tem peso mas não tem ID.`}; if(!(x.n>=1)) return {err:`O ID ${x.id} precisa de pelo menos 1 volume.`};
+      const ch=x.id+"|"+(x.emb||""); if(seen[ch]) return {err:`O ID ${x.id}${x.emb?` em ${x.emb}`:""} aparece mais de uma vez. Junte os volumes numa linha só.`}; seen[ch]=1;
+      const kg=String(x.kg).trim()?parseKg(String(x.kg)):0; if(String(x.kg).trim()&&!(kg>0)) return {err:`O peso do ID ${x.id} não é um número válido.`};
+      out.push({id:x.id,emb:x.emb||"",n:x.n,kg:r3(kg||0)}); }
+    return {rows:out,semPeso:out.filter(x=>!x.kg).map(x=>x.id)}; };
+  draw(); ready=true;
+  return {L,draw,tot,validate};
+}
+function fecharFrac(movId){ const f=S.movs.find(x=>x.id===movId); if(!f||!FULL()) return;
+  confirmar("Encerrar fracionamento",`Marca que nada do fracionamento de ${fmtD(f.data)} (${f.ids||""}) voltou ao estoque: todo o conteúdo foi usado na análise. O lançamento de saída continua como está.`,"Nada voltou",
+    ()=>guard(async()=>{ if(db) await db.collection("movs").doc(movId).update({fracFechado:true}); else { f.fracFechado=true; refresh(); } },"Fracionamento encerrado")); }
 const MV_LABEL = {entrada:"Entrada",saida:"Retirada",descarte:"Descarte",ajuste:"Ajuste",reclass_out:"Reclassificação (saída)",reclass_in:"Reclassificação (entrada)"};
 
 /* ======================= Persistência ======================= */
@@ -861,16 +953,9 @@ function stBadge(m){ if(m.status==="pendente") return `<span class="catb" style=
 function quemLancou(m){ const p=S.pessoas.find(x=>x.id===m.por); return m.porNome||(p&&(p.nome||p.email))||m.por||""; }
 /* aplica no lote a mudança de IDs e pesos registrada no "plano" do lançamento */
 async function aplicarMov(m,zerou){
-  const a=S.amostras.find(x=>x.id===m.amostraId); if(!a) return; const io=idsOf(a); const P=m.plano||{};
-  let ids=[...io.ids], qq={...io.q}, kg={...io.kg}, changed=false; const un=i=>(io.q&&io.q[i])||1; const ku=i=>(Number(io.kg[i])||0)/un(i);
-  if(m.tipo==="entrada"){ for(const i of (P.typed||[])){ if(!ids.includes(i)) ids.push(i); if(P.ku) kg[i]=P.ku; changed=true; } }
-  else { const sel=P.sel||{}; const keys=Object.keys(sel).filter(i=>io.ids.includes(i)); const est=keys.reduce((s,i)=>s+ku(i)*Math.min(un(i),sel[i]),0);
-    for(const i of keys){ const n=Math.min(un(i),Number(sel[i])||0), k0=Number(kg[i])||0;
-      const share=P.kgVal!=null?(est>0?P.kgVal*(ku(i)*n)/est:P.kgVal/keys.length):ku(i)*n;
-      if(n>=un(i)){ ids=ids.filter(x=>x!==i); delete qq[i]; delete kg[i]; }
-      else { const rest=un(i)-n; if(rest>1) qq[i]=rest; else delete qq[i]; kg[i]=Math.max(0,Math.round((k0-share)*1000)/1000); }
-      changed=true; } }
-  if(changed) await store.updateAmostra(a.id,{ids,idsQ:qq,idsKg:kg,idsConf:io.conf||"",atualizadoEm:m.data||hoje()});
+  const a=S.amostras.find(x=>x.id===m.amostraId); if(!a) return; const io=idsOf(a);
+  const st=aplicarPlano(io,m);
+  if(st) await store.updateAmostra(a.id,patchIds(st,io.conf,m.data));
   if(m.tipo==="descarte"&&zerou) await store.updateAmostra(a.id,{descartada:true,atualizadoEm:m.data||hoje()});
 }
 async function confirmarMov(id){
@@ -1050,6 +1135,7 @@ function ptabs(obj,key,list){ return `<div class="ptabs" role="group">${list.map
 function instalarCard(){ return INSTALL_EVT?`<div class="panel" style="flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap"><img src="icones/icone-192.png" alt="" width="44" height="44" style="border-radius:10px"><div style="flex:1;min-width:180px"><b>Instale o app neste aparelho</b><div class="sub">Abre em tela cheia, com ícone próprio, como um aplicativo.</div></div><button class="btn primary" data-act="instalar">Instalar</button></div>`:""; }
 function mobQuick(){ return S.readonly?"":`<div class="mobq"><button class="btn primary" data-act="qnova">+ Nova amostra</button><button class="btn" data-act="qret">Registrar retirada</button></div>`; }
 function diasTxt(r){ if(r.dias==null||r.descartada||r.saldo<=0) return ""; return r.dias<=0?`vencida há ${-r.dias} d`:`${r.dias} dias`; }
+function fracNota(r,ro){ const F=fracAbertos(r.id); if(!F.length) return ""; return `<div class="mmeta" style="color:var(--warn)">🧪 ${F.length===1?"Fracionamento":F.length+" fracionamentos"} aguardando os frascos${ro?"":` · <button type="button" class="linkbtn" data-act="fracret" data-id="${F[0].id}" style="color:inherit;text-decoration:underline">registrar frascos</button>`}</div>`; }
 function cardAmostra(r,ro){
   const kg=r.saldo>0&&!r.descartada?kgOf(r):0;
   return `<div class="mcard" style="--c:${ST_COLOR[r.st]||"var(--accent)"}">
@@ -1057,9 +1143,11 @@ function cardAmostra(r,ro){
     <div class="mrow"><div class="mmeta">Validade <span class="mono">${fmtD(r.validade)}</span>${diasTxt(r)?` · <b style="color:${ST_COLOR[r.st]}">${diasTxt(r)}</b>`:""}<br>${!ro&&!r.descartada?`<button type="button" class="linkbtn" data-act="local" data-id="${r.id}">📍 ${esc(r.local||"definir local")} ✎</button>`:"📍 "+esc(r.local||"sem local")}</div>
       <div style="text-align:right"><div class="mbig">${nf(r.saldo)} <span class="mmeta">${esc(r.unidade||"un")}</span></div><div class="mmeta">${kg?fkg(kg)+" kg":""}</div></div></div>
     ${r.pendIn||r.pendOut?`<div class="mmeta" style="color:var(--warn)">⏳ ${[r.pendIn?"+"+nf(r.pendIn):"",r.pendOut?"−"+nf(r.pendOut):""].filter(Boolean).join(" / ")} aguardando confirmação</div>`:""}
+    ${fracNota(r,ro)}
     <div class="macts">
       ${!ro&&r.st==="vencida"&&r.saldo>0?`<button class="btn sm danger" data-act="descartar" data-id="${r.id}">Descartar</button>`:""}
       ${!ro&&r.saldo>0&&!r.descartada&&r.st!=="vencida"?`<button class="btn sm primary" data-act="retirar" data-id="${r.id}">Retirar</button>`:""}
+      ${!ro&&r.disp>0&&!r.descartada&&r.st!=="vencida"?`<button class="btn sm" data-act="frac" data-id="${r.id}">Fracionar</button>`:""}
       ${!ro&&!r.descartada?`<button class="btn sm" data-act="entrada" data-id="${r.id}">+ Entrada</button>`:""}
       ${FULL()&&!ro&&!r.descartada&&idsOf(r).conf?`<button class="btn sm" data-act="ajustar" data-id="${r.id}" style="color:var(--warn);border-color:var(--warn)">Conferir</button>`:""}
       <button class="btn sm" data-act="hist" data-id="${r.id}">Detalhes</button>
@@ -1190,7 +1278,7 @@ function dataEstoque(){
   return resumo+`
   <div class="tablebox"><table><thead><tr><th>Produto</th><th>Lote</th><th class="c-opt">Tipo</th><th class="c-opt">Fabricação</th><th>Validade</th><th class="num">Dias</th><th>Situação</th><th class="num">Saldo</th><th class="num">Peso (kg)</th><th>Localização</th><th class="c-opt2">Atualização</th><th></th></tr></thead><tbody>
   ${R.map(r=>`<tr class="row">
-    <td><div class="prod">${esc(r.produto)}</div><div class="sub">${[r.mapa?"MAPA "+r.mapa:"",r.codigo,r.conteudo].filter(Boolean).map(esc).join(" · ")}</div></td>
+    <td><div class="prod">${esc(r.produto)}</div><div class="sub">${[r.mapa?"MAPA "+r.mapa:"",r.codigo,r.conteudo].filter(Boolean).map(esc).join(" · ")}</div>${fracNota(r,ro)}</td>
     <td class="mono">${esc(r.lote)}${r.tipo?`<div class="sub c-alt" style="font-family:var(--body)">${esc(r.tipo)}</div>`:""}</td><td class="nowrap c-opt">${esc(r.tipo||"—")}</td>
     <td class="mono c-opt">${fmtD(r.fabricacao)}</td><td class="mono">${fmtD(r.validade)}<div class="sub c-alt">fab. ${fmtD(r.fabricacao)}</div></td>
     <td class="num" style="color:${r.st==="vencida"?"var(--bad)":r.st==="avencer"?"var(--warn)":"inherit"}">${r.dias==null||r.descartada||r.saldo<=0?"—":r.dias}</td>
@@ -1198,6 +1286,7 @@ function dataEstoque(){
     <td class="nowrap">${!ro&&!r.descartada?`<button type="button" class="linkbtn" data-act="local" data-id="${r.id}" title="Mudar local de armazenamento">${esc(r.local||"definir local")} <span aria-hidden="true">✎</span></button>`:esc(r.local||"—")}</td><td class="c-opt2"><div class="mono">${fmtD(r.atual)}</div><div class="sub">${esc(r.respUlt)}</div></td>
     <td><div class="rowacts">
       ${!ro&&r.saldo>0&&!r.descartada?`<button class="btn sm" data-act="retirar" data-id="${r.id}" title="Registrar retirada">Retirar</button>`:""}
+      ${!ro&&r.disp>0&&!r.descartada&&r.st!=="vencida"?`<button class="btn sm" data-act="frac" data-id="${r.id}" title="Abrir um volume para o laboratório e devolver o restante em frascos">Fracionar</button>`:""}
       ${!ro&&!r.descartada?`<button class="btn sm" data-act="entrada" data-id="${r.id}" title="Adicionar unidades">+ Entrada</button>`:""}
       ${FULL()&&!ro&&!r.descartada&&idsOf(r).conf?`<button class="btn sm" data-act="ajustar" data-id="${r.id}" title="IDs não batem com o saldo" style="color:var(--warn);border-color:var(--warn)">Conferir</button>`:""}
       <button class="btn sm" data-act="hist" data-id="${r.id}" title="Histórico e edição">Detalhes</button>
@@ -1402,7 +1491,7 @@ async function saveAcesso(uid,role){
 
 /* ---------- Cadastros ---------- */
 function shellCadastros(){ return `<div id="data"></div>`; }
-const LISTS = [["analistas","Analistas / responsáveis","Quem cadastra, retira ou descarta."],["locais","Localizações","Onde as amostras ficam guardadas."],["tipos","Tipos de amostra",""],["motivos","Motivos de retirada",""],["destinos","Destinos",""],["unidades","Unidades",""],["motivosReclass","Motivos de reclassificação","Aparecem ao reclassificar um lote (ex.: orgânico → convencional)."]];
+const LISTS = [["analistas","Analistas / responsáveis","Quem cadastra, retira ou descarta."],["locais","Localizações","Onde as amostras ficam guardadas."],["tipos","Tipos de amostra",""],["motivos","Motivos de retirada",""],["destinos","Destinos",""],["unidades","Unidades",""],["motivosReclass","Motivos de reclassificação","Aparecem ao reclassificar um lote (ex.: orgânico → convencional)."],["embalagens","Tipos de embalagem","Usados no cadastro das amostras e no fracionamento. O mesmo ID pode existir em embalagens diferentes."]];
 function dataCadastros(){
   const ro=S.readonly||!FULL();
   if(FULL()&&S.mode==="db") setTimeout(resolveAccNames,0);
@@ -1433,7 +1522,7 @@ function dataCadastros(){
     </tbody></table></div></div>
   <div class="lists">${LISTS.map(([k,t,d])=>`<div class="panel"><h2>${t} <small>${(S.cfg[k]||[]).length}</small></h2>${d?`<p class="sub" style="margin:0">${d}</p>`:""}
     <div class="chips">${(S.cfg[k]||[]).map((v,i)=>`<span class="chip">${esc(v)}${ro?"":`<button data-act="rmlist" data-k="${k}" data-i="${i}" aria-label="Remover ${esc(v)}">×</button>`}</span>`).join("")||`<span class="sub">Lista vazia.</span>`}</div>
-    ${ro?"":`<form class="addrow" data-k="${k}"><input id="add-${k}" placeholder="Adicionar…" aria-label="Adicionar em ${t}"><button class="btn sm" type="submit">Adicionar</button></form>`}</div>`).join("")}</div>`;
+    ${ro?"":`<form class="addrow" data-k="${k}"><input id="add-${k}" placeholder="${k==="embalagens"?"ex.: Frasco 0,500 kg":"Adicionar…"}" aria-label="Adicionar em ${t}"><button class="btn sm" type="submit">Adicionar</button></form>`}</div>`).join("")}</div>`;
 }
 
 /* ======================= Eventos ======================= */
@@ -1471,6 +1560,8 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="saveconf"){ const v=$("#cfgconf").value; await guard(()=>store.saveCfg({...S.cfg,confirmacao:v}),"Regra de confirmação salva"); refresh(true); }
   else if(act==="retirar") formMov(id,"saida");
   else if(act==="entrada") formMov(id,"entrada");
+  else if(act==="frac") formFrac(id);
+  else if(act==="fracret"){ const fm=S.movs.find(x=>x.id===id); if(fm) formMov(fm.amostraId,"entrada",null,{fracId:fm.fracId}); }
   else if(act==="descartar") formMov(id,"descarte");
   else if(act==="hist") historico(id);
   else if(act==="ajustar") ajustarLote(id);
@@ -1552,9 +1643,8 @@ function formAmostra(a){
    <div class="field"><label for="a_loc">Localização</label><input id="a_loc" list="dll" value="${esc(a.local)}">${dl("dll",locs)}</div>
    <div class="field"><label for="a_resp">Responsável</label><select id="a_resp">${opts(S.cfg.analistas,a.responsavel,"—")}</select></div>
    ${ed?"":`<div class="field full"><label>Amostras guardadas *</label>
-     <div class="sub" style="margin:0 0 6px">Uma linha por amostra: o ID da etiqueta, quantos volumes têm esse ID e o peso total desses volumes. Enter no peso abre a próxima linha. Também dá para colar uma lista do Excel (ID · volumes · peso).</div>
-     <div class="tablebox"><table class="na-rows"><thead><tr><th>ID</th><th class="num">Volumes<br><span class="thu">un</span></th><th class="num">Peso total<br><span class="thu">kg</span></th><th></th></tr></thead><tbody id="na_rows"></tbody></table></div>
-     <div class="na-tot"><button type="button" class="btn sm" id="na_add">+ Adicionar amostra</button><div class="sub" id="na_sum"></div></div></div>`}
+     <div class="sub" style="margin:0 0 6px">Uma linha por amostra: o ID da etiqueta, a embalagem, quantos volumes têm esse ID e o peso total desses volumes. O mesmo ID pode se repetir quando a embalagem é diferente. Enter no peso abre a próxima linha. Também dá para colar do Excel (ID · embalagem · volumes · peso).</div>
+     ${rowsBox("na","+ Adicionar amostra")}</div>`}
    <div class="field full"><label for="a_obs">Observação</label><textarea id="a_obs">${esc(a.obs)}</textarea></div>
    <div class="formerr full" id="a_err"></div>`;
   const foot=`${ed?`<button type="button" class="btn danger" id="a_del" style="margin-right:auto">Excluir cadastro</button>`:""}<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">${ed?"Salvar alterações":"Cadastrar amostra"}</button>`;
@@ -1567,32 +1657,8 @@ function formAmostra(a){
   fabEl.addEventListener("input",valSync); fabEl.addEventListener("change",valSync);
   valEl.addEventListener("input",()=>{ valAuto = valEl.value===mais2anos(fabEl.value); valHint.textContent=valAuto?"(2 anos após a fabricação)":"(alterada à mão)"; });
   valSync();
-  const NA=[{id:"",n:1,kg:""}];
-  const naFmt=v=>v===""||v==null?"":String(v);
-  const naSum=()=>{ const box=m.ov.querySelector("#na_sum"); if(!box) return; const ok=NA.filter(x=>x.id); const t=ok.reduce((s,x)=>s+(Number(x.n)||0),0), k=ok.reduce((s,x)=>s+(parseKg(String(x.kg))||0),0);
-    box.innerHTML=`Quantidade guardada: <b>${t}</b> ${esc(m.ov.querySelector("#a_un").value||"un")} · peso total <b>${fkg(k)}</b> kg`; };
-  const naDraw=(focusK)=>{ const tb=m.ov.querySelector("#na_rows"); if(!tb) return;
-    tb.innerHTML=NA.map((x,k)=>`<tr><td><input class="na_id" data-k="${k}" value="${esc(x.id)}" placeholder="ex.: A41" aria-label="ID da amostra ${k+1}" style="font-family:var(--mono);text-transform:uppercase"></td>
-      <td class="num"><input class="na_n" data-k="${k}" type="number" min="1" step="1" value="${x.n}" aria-label="Volumes da amostra ${k+1}" style="text-align:right"></td>
-      <td class="num"><input class="na_kg" data-k="${k}" inputmode="decimal" value="${esc(naFmt(x.kg))}" placeholder="0,000" aria-label="Peso total da amostra ${k+1} em kg" style="text-align:right;font-family:var(--mono)"></td>
-      <td><button type="button" class="btn sm na_rm" data-k="${k}" aria-label="Remover linha ${k+1}"${NA.length===1?" disabled":""}>×</button></td></tr>`).join("");
-    naSum(); if(focusK!=null){ const f=tb.querySelector(`.na_id[data-k="${focusK}"]`); if(f) f.focus(); } };
-  if(!ed){ naDraw();
-    m.ov.querySelector("#na_add").onclick=()=>{ NA.push({id:"",n:1,kg:""}); naDraw(NA.length-1); };
-    m.ov.querySelector("#a_un").addEventListener("change",naSum);
-    const tb=m.ov.querySelector("#na_rows");
-    tb.addEventListener("input",ev=>{ const t=ev.target, k=+t.dataset.k; if(!NA[k]) return;
-      if(t.classList.contains("na_id")) NA[k].id=t.value.trim().toUpperCase(); else if(t.classList.contains("na_n")) NA[k].n=parseInt(t.value)||0; else if(t.classList.contains("na_kg")) NA[k].kg=t.value; naSum(); });
-    tb.addEventListener("click",ev=>{ const b=ev.target.closest(".na_rm"); if(!b) return; ev.preventDefault(); NA.splice(+b.dataset.k,1); if(!NA.length) NA.push({id:"",n:1,kg:""}); naDraw(); });
-    tb.addEventListener("keydown",ev=>{ if(ev.key!=="Enter") return; const t=ev.target; if(!t.classList.contains("na_kg")&&!t.classList.contains("na_n")&&!t.classList.contains("na_id")) return; ev.preventDefault();
-      const k=+t.dataset.k; if(t.classList.contains("na_id")){ const nx=tb.querySelector(`.na_kg[data-k="${k}"]`); nx&&nx.focus(); return; }
-      if(k===NA.length-1){ NA.push({id:"",n:1,kg:""}); naDraw(NA.length-1); } else { const f=tb.querySelector(`.na_id[data-k="${k+1}"]`); f&&f.focus(); } });
-    tb.addEventListener("paste",ev=>{ const t=ev.target; if(!t.classList.contains("na_id")) return; const txt=(ev.clipboardData||window.clipboardData).getData("text"); if(!/[\t\n;]/.test(txt.trim())) return;
-      ev.preventDefault(); const k=+t.dataset.k;
-      const lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/\t|;/).map(c=>c.trim()));
-      const novos=lines.filter(c=>c[0]&&!/^id$/i.test(c[0])).map(c=>c.length>=3?{id:c[0].toUpperCase(),n:parseInt(c[1])||1,kg:c[2]}:{id:c[0].toUpperCase(),n:1,kg:c[1]||""});
-      if(!novos.length) return; const vazio=!NA[k].id&&!NA[k].kg; NA.splice(vazio?k:k+1,vazio?1:0,...novos); naDraw(); toast(`${novos.length} amostra${novos.length===1?"":"s"} colada${novos.length===1?"":"s"}`); });
-  }
+  const RE=ed?null:rowEditor(m.ov,"na",{emb0:embPadrao(),sumLabel:"Quantidade guardada",un:()=>m.ov.querySelector("#a_un").value||"un"});
+  if(RE) m.ov.querySelector("#a_un").addEventListener("change",()=>RE.draw());
   if(ed) m.ov.querySelector("#a_del").onclick=()=>{ m.close(); confirmar("Excluir cadastro",`Apaga o lote ${a.lote} de ${a.produto} e todas as suas movimentações. Use só para cadastro feito por engano; para amostra usada ou vencida, registre a retirada ou o descarte.`,"Excluir",()=>guard(()=>store.deleteAmostra(a.id),"Cadastro excluído")); };
   m.form.onsubmit=async e=>{
     e.preventDefault(); const g=id=>m.ov.querySelector("#"+id).value.trim();
@@ -1600,30 +1666,28 @@ function formAmostra(a){
     const err=m.ov.querySelector("#a_err");
     if(!d.produto||!d.lote||!d.validade){ err.textContent="Preencha produto, lote e data de validade."; return; }
     if(d.fabricacao&&d.validade<d.fabricacao){ err.textContent="A validade não pode ser anterior à fabricação."; return; }
-    let qtd=0, naIds=[], naQ={}, naKg={};
-    if(!ed){ const L=NA.filter(x=>x.id||String(x.kg).trim());
-      if(!L.length){ err.textContent="Inclua pelo menos uma amostra com o ID da etiqueta."; return; }
-      for(const [k,x] of L.entries()){ if(!x.id){ err.textContent=`A linha ${k+1} tem peso mas não tem ID.`; return; } if(!(x.n>=1)){ err.textContent=`O ID ${x.id} precisa de pelo menos 1 volume.`; return; }
-        if(naIds.includes(x.id)){ err.textContent=`O ID ${x.id} aparece mais de uma vez. Junte os volumes numa linha só.`; return; }
-        const kg=String(x.kg).trim()?parseKg(String(x.kg)):0; if(String(x.kg).trim()&&!(kg>0)){ err.textContent=`O peso do ID ${x.id} não é um número válido.`; return; }
-        naIds.push(x.id); if(x.n>1) naQ[x.id]=x.n; if(kg) naKg[x.id]=Math.round(kg*1000)/1000; qtd+=x.n; }
-      const semPeso=naIds.filter(i=>!naKg[i]); if(semPeso.length&&!err.dataset.semkg){ err.textContent=`Sem peso: ${semPeso.join(", ")}. Clique de novo para cadastrar mesmo assim, ou preencha o peso.`; err.dataset.semkg="1"; return; } }
+    let qtd=0, NST=null;
+    if(!ed){ const v=RE.validate(); if(v.err){ err.textContent=v.err; return; }
+      if(!v.rows.length){ err.textContent="Inclua pelo menos uma amostra com o ID da etiqueta."; return; }
+      if(v.semPeso.length&&!err.dataset.semkg){ err.textContent=`Sem peso: ${v.semPeso.join(", ")}. Clique de novo para cadastrar mesmo assim, ou preencha o peso.`; err.dataset.semkg="1"; return; }
+      NST=entrarLinhas({ids:[],q:{},kg:{},emb:{}},v.rows); qtd=v.rows.reduce((s,x)=>s+x.n,0); }
     const dup=S.amostras.find(x=>x.id!==a.id&&norm(x.produto)===norm(d.produto)&&norm(x.lote)===norm(d.lote)&&x.tipo===d.tipo&&!x.descartada);
     if(dup&&!err.dataset.dupok){ err.textContent="Já existe esse produto/lote/tipo em estoque. Para somar unidades use “+ Entrada” no lote existente. Clique de novo para cadastrar mesmo assim."; err.dataset.dupok="1"; return; }
     if(d.responsavel) LS.set("resp",d.responsavel);
     m.close();
     if(ed) await guard(()=>store.updateAmostra(a.id,{...d,atualizadoEm:hoje()}),"Amostra atualizada");
-    else { d.ids=naIds; if(Object.keys(naQ).length) d.idsQ=naQ; if(Object.keys(naKg).length) d.idsKg=naKg; await guard(()=>store.addAmostra(d,qtd,d.responsavel),"Amostra cadastrada"); }
+    else { d.ids=NST.ids; d.idsQ=NST.q; d.idsKg=NST.kg; d.idsEmb=NST.emb; await guard(()=>store.addAmostra(d,qtd,d.responsavel),"Amostra cadastrada"); }
   };
 }
 
-function formMov(id, tipo, clienteId){
+function formMov(id, tipo, clienteId, opt){
+  opt=opt||{};
   if(S.readonly) return;
   const R=rows(); let r=id?R.find(x=>x.id===id):null;
   const elig=R.filter(x=>tipo==="entrada"?!x.descartada:(x.disp>0&&!x.descartada)).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(a.lote).localeCompare(String(b.lote)));
   if(!r&&!elig.length){ toast("Não há amostras com saldo para retirar."); return; }
   const titles={saida:"Registrar retirada",entrada:"Registrar entrada",descarte:"Registrar descarte"};
-  const motivos= tipo==="descarte"? S.cfg.motivos.filter(m=>/descarte/i.test(m)) : tipo==="entrada"? ["Complemento de amostra","Devolução","Ajuste de inventário"] : S.cfg.motivos.filter(m=>!/descarte/i.test(m));
+  const motivos= tipo==="descarte"? S.cfg.motivos.filter(m=>/descarte/i.test(m)) : tipo==="entrada"? ["Complemento de amostra","Retorno do fracionamento","Devolução","Ajuste de inventário"] : S.cfg.motivos.filter(m=>!/descarte/i.test(m));
   const sel=`<div class="field"><label for="m_lotq">Lote *</label><input id="m_lotq" autocomplete="off" value="${r?esc(r.lote):""}" placeholder="Digite o lote, ex.: 31484-1" style="font-family:var(--mono)"${r?" readonly":""}></div>
     <div class="field"><label for="m_saldov">Saldo disponível</label><input id="m_saldov" readonly tabindex="-1" placeholder="—" style="font-family:var(--mono)"></div>
     <div class="field full"><label>Produto</label><div id="m_prodv" class="fieldbox" aria-live="polite"></div></div>
@@ -1638,10 +1702,13 @@ function formMov(id, tipo, clienteId){
     <div class="field"><label for="m_mot">Motivo</label><select id="m_mot">${opts(motivos.length?motivos:["Outro"],clienteId?(motivos.find(x=>(isLab(clienteId)?/externa/i:/cliente/i).test(x))||""):"")}</select></div>
     ${tipo==="saida"?`<div class="field"><label for="m_dest">Destino</label><select id="m_dest">${opts(S.cfg.destinos,clienteId?(S.cfg.destinos.find(x=>/extern/i.test(x))||""):"","—")}</select></div>
     <div class="field full" id="m_cliwrap"><label for="m_cli">Cliente / laboratório</label><select id="m_cli"><option value="">—</option>${S.clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt")).map(c=>`<option value="${c.id}"${c.id===clienteId?" selected":""}>${esc(c.nome)}${c.pais?" · "+esc(c.pais):""}</option>`).join("")}</select></div>`:`<div class="field"></div>`}
-    <div class="field full"><label for="m_ids">ID da(s) amostra(s)</label><div class="chips" id="m_idchips" style="margin-bottom:6px"></div>
-      ${out?`<div id="m_selbox" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>`:""}
-      <input id="m_ids" placeholder="${out?"Clique nos IDs acima ou digite, ex.: A125x1, B124":"IDs das novas amostras, ex.: A120, A121"}" style="font-family:var(--mono)"><div class="sub" id="m_kgsel" style="margin-top:4px"></div></div>
-    ${tipo==="entrada"?`<div class="field"><label for="m_kgun">Peso por amostra (kg)</label><input id="m_kgun" type="number" step="0.001" min="0" inputmode="decimal" placeholder="ex.: 0,345"></div><div class="field"></div>`:`<div class="field"><label for="m_kg">Peso retirado (kg)</label><input id="m_kg" inputmode="decimal" autocomplete="off" placeholder="Cole ou digite, ex.: 0,250" style="font-family:var(--mono)"></div><div class="field" style="justify-content:flex-end"><div class="sub" id="m_kgparse">Aceita vírgula ou ponto. Vários pesos colados (um por linha) são somados.</div></div>`}
+    ${out?`<div class="field full"><label for="m_ids">ID da(s) amostra(s)</label><div class="chips" id="m_idchips" style="margin-bottom:6px"></div>
+      <div id="m_selbox" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
+      <input id="m_ids" placeholder="Clique nos IDs acima ou digite, ex.: A125x1, B124" style="font-family:var(--mono)"><div class="sub" id="m_kgsel" style="margin-top:4px"></div></div>`
+    :`<div class="field full" id="m_fracw" hidden><label for="m_frac">Retorno de fracionamento</label><select id="m_frac"></select><div class="sub" id="m_fracinfo" style="margin-top:4px"></div></div>
+      <div class="field full"><label>Amostras que entram *</label><div class="chips" id="m_idchips" style="margin-bottom:6px"></div>
+      <div class="sub" style="margin:0 0 6px">Uma linha por ID e embalagem. O mesmo ID pode se repetir em embalagens diferentes (ex.: A5 em frascos de 0,250 e de 0,350 kg).</div>${rowsBox("me","+ Adicionar amostra")}</div>`}
+    ${tipo==="entrada"?"":`<div class="field"><label for="m_kg">Peso retirado (kg)</label><input id="m_kg" inputmode="decimal" autocomplete="off" placeholder="Cole ou digite, ex.: 0,250" style="font-family:var(--mono)"></div><div class="field" style="justify-content:flex-end"><div class="sub" id="m_kgparse">Aceita vírgula ou ponto. Vários pesos colados (um por linha) são somados.</div></div>`}
     <div class="field full"><label for="m_resp">Responsável *</label><select id="m_resp">${opts(S.cfg.analistas,lastResp(),"Selecione")}</select></div>
     <div class="field full"><label for="m_obs" id="m_obsl">Observação</label><input id="m_obs" placeholder="${tipo==="saida"?"ex.: nº da análise, cliente, protocolo de reclamação":""}"></div>
     ${out?fotoBox(tipo==="descarte"?[["saida","Fotos do descarte"]]:[["saida","Fotos da saída"],["preparo","Fotos do preparo"]]):""}
@@ -1657,7 +1724,10 @@ function formMov(id, tipo, clienteId){
   const avail=(io,i)=>Math.max(0,((io.q&&io.q[i])||1)-(RES[i]||0));
   const kgUnit=(io,i)=>(Number(io.kg[i])||0)/unOf(io,i);
   const tokens=()=>{ const io=idsOf(r); return Object.keys(selQ).map(i=>unOf(io,i)>1?`${i}x${selQ[i]}`:i).join(", "); };
-  const parseSel=t=>{ const io=idsOf(r), o={}; String(t||"").split(/[,;\s]+/).map(x=>x.trim().toUpperCase()).filter(Boolean).forEach(x=>{ const mm=x.match(/^(.+?)(?:[X×*](\d+))?$/); if(!mm) return; const i=mm[1]; const n=mm[2]?parseInt(mm[2]):1; if(!io.ids.includes(i)||!avail(io,i)) return; o[i]=Math.max(1,Math.min(avail(io,i),n)); }); return o; };
+  const parseSel=t=>{ const io=idsOf(r), o={}; let s=" "+String(t||"").toUpperCase()+" ";
+    const keys=[...io.ids].sort((a,b)=>b.length-a.length); const put=(i,n)=>{ if(!avail(io,i)) return; o[i]=Math.max(1,Math.min(avail(io,i),n)); };
+    for(const k of keys){ if(!/[\s(]/.test(k)) continue; const K=k.toUpperCase(); let p; while((p=s.indexOf(K))>=0){ const rest=s.slice(p+K.length); const mm=rest.match(/^\s*[X×*](\d+)/); put(k,mm?parseInt(mm[1]):1); s=s.slice(0,p)+" "+rest.slice(mm?mm[0].length:0); } }
+    s.split(/[,;\s]+/).filter(Boolean).forEach(x=>{ const mm=x.match(/^(.+?)(?:[X×*](\d+))?$/); if(!mm) return; const i=keys.find(k=>k.toUpperCase()===mm[1]); if(!i) return; put(i,mm[2]?parseInt(mm[2]):1); }); return o; };
   const estKg=()=>{ const io=idsOf(r); return Object.keys(selQ).reduce((s,i)=>s+kgUnit(io,i)*selQ[i],0); };
   const selUnits=()=>Object.values(selQ).reduce((s,n)=>s+n,0);
   const paint=(fromInput)=>{
@@ -1683,8 +1753,9 @@ function formMov(id, tipo, clienteId){
     q("#m_ref").hidden=false; q("#m_prodv").textContent=r.produto; q("#m_saldov").value=`${nf(out?r.disp:r.saldo)} ${r.unidade||"un"}${r.st==="vencida"?" · vencida":""}`; RES=reservas(r.id); q("#m_ref").innerHTML=`<div><div class="sub">Validade ${fmtD(r.validade)} · ${esc(r.local||"sem local")}</div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")} em estoque</span>${r.pendOut?`<div class="sub" style="color:var(--warn)">${nf(r.pendOut)} reservada${r.pendOut===1?"":"s"} em saídas aguardando confirmação · disponível ${nf(r.disp)}</div>`:""}</div>`;
     if(tipo==="descarte") q("#m_qtd").value=r.disp;
     const io=idsOf(r), box=q("#m_idchips");
-    if(!out||!io.ids.length){ box.innerHTML=out?`<span class="sub">Nenhum ID registrado para este lote.</span>`:""; }
-    else { box.innerHTML=`<span class="sub" style="width:100%">IDs em estoque (${io.ids.length}) · clique para retirar 1 volume${io.conf?` · <span style="color:var(--warn)">conferir: ${esc(io.conf)}</span>`:""}</span>`+io.ids.filter(i=>!out||avail(io,i)>0).map(i=>`<button type="button" class="chip idc" data-id="${esc(i)}" style="padding:3px 10px;cursor:pointer;font-family:var(--mono);border:1px solid var(--line)">${esc(idLabel(i,io.q,io.kg))}</button>`).join("");
+    if(!out){ box.innerHTML=io.ids.length?`<span class="sub" style="width:100%">Já no lote (${io.ids.length})</span>`+io.ids.map(i=>`<span class="chip" style="padding:3px 10px;font-family:var(--mono)">${esc(idLabel(i,io.q,io.kg,io.emb))}</span>`).join(""):""; fracSync(); }
+    else if(!io.ids.length){ box.innerHTML=`<span class="sub">Nenhum ID registrado para este lote.</span>`; }
+    else { box.innerHTML=`<span class="sub" style="width:100%">IDs em estoque (${io.ids.length}) · clique para retirar 1 volume${io.conf?` · <span style="color:var(--warn)">conferir: ${esc(io.conf)}</span>`:""}</span>`+io.ids.filter(i=>!out||avail(io,i)>0).map(i=>`<button type="button" class="chip idc" data-id="${esc(i)}" style="padding:3px 10px;cursor:pointer;font-family:var(--mono);border:1px solid var(--line)">${esc(idLabel(i,io.q,io.kg,io.emb))}</button>`).join("");
       if(tipo==="descarte"){ io.ids.forEach(i=>{ const av=avail(io,i); if(av>0) selQ[i]=av; }); } }
     paint(); };
   m.ov.addEventListener("click",ev=>{ const sg=ev.target.closest(".lsug"); if(sg){ ev.preventDefault(); escolherLote(sg.dataset.id); return; } if(!r) return; const io=idsOf(r);
@@ -1698,6 +1769,21 @@ function formMov(id, tipo, clienteId){
   m.ov.addEventListener("input",ev=>{ if(ev.target.id==="m_lotq"){ buscaLote(); return; } if(ev.target.id==="m_ids"&&out){ if(!r) return; selQ=parseSel(ev.target.value); paint(true); } if(ev.target.id==="m_kg"){ ev.target.dataset.touched=ev.target.value.trim()?"1":""; showKg(); } });
   m.ov.addEventListener("paste",ev=>{ if(ev.target.id!=="m_kg") return; const t=(ev.clipboardData||window.clipboardData)?.getData("text"); if(!t) return; ev.preventDefault();
     const v=parseKg(t); ev.target.value=v==null?t.trim():String(v).replace(".",","); ev.target.dataset.touched="1"; showKg(); });
+  /* entrada: linhas por ID/embalagem; quantidade = soma dos volumes */
+  const RE=out?null:rowEditor(m.ov,"me",{emb0:embPadrao(),sumLabel:"Entram",un:()=>(r&&r.unidade)||"un",onChange:t=>{ q("#m_qtd").value=t.n||""; fracInfo(); }});
+  if(!out){ q("#m_qtd").readOnly=true; q("#m_qtd").title="Soma dos volumes das linhas abaixo"; }
+  function fracInfo(){ const sel=q("#m_frac"), inf=q("#m_fracinfo"); if(!sel||!inf) return; const fm=S.movs.find(x=>x.id===sel.value);
+    if(!fm){ inf.textContent=""; return; } const kin=RE?RE.tot().kg:0, ko=Number(fm.kg)||0;
+    inf.innerHTML=`Saiu ${nf(fm.qtd)} volume${Number(fm.qtd)===1?"":"s"} (${esc(fm.ids||"")}) com <b>${fkg(ko)} kg</b> em ${fmtD(fm.data)} · voltando <b>${fkg(kin)} kg</b>${ko&&kin<=ko?` · usado na análise <b>${fkg(ko-kin)} kg</b>`:""}${ko&&kin>ko?` · <span style="color:var(--bad)">volta mais do que saiu</span>`:""}`; }
+  function fracSync(){ const w=q("#m_fracw"); if(!w) return; const F=r?fracAbertos(r.id):[]; w.hidden=!F.length; if(!F.length){ q("#m_frac").innerHTML=""; return; }
+    const pre=opt.fracId&&F.some(x=>x.fracId===opt.fracId)?opt.fracId:"";
+    q("#m_frac").innerHTML=`<option value="">Não é retorno de fracionamento</option>`+F.map(x=>`<option value="${x.id}"${x.fracId===pre?" selected":""}>${fmtD(x.data)} · ${esc(x.ids||"")} · ${fkg(Number(x.kg)||0)} kg${x.status==="pendente"?" · aguardando confirmação":""}</option>`).join("");
+    fracPick(); }
+  function fracPick(){ const sel=q("#m_frac"); if(!sel) return; const fm=S.movs.find(x=>x.id===sel.value);
+    if(fm){ const mo=q("#m_mot"); mo.value="Retorno do fracionamento";
+      if(RE&&RE.L.length===1&&!RE.L[0].id){ const k0=Object.keys((fm.plano&&fm.plano.sel)||{})[0]; const io=idsOf(r); if(k0){ RE.L[0].id=baseId(k0,io.emb[k0]); } const fe=EMB().find(x=>/frasco/i.test(x)); if(fe) RE.L[0].emb=fe; RE.draw(); } }
+    fracInfo(); }
+  if(q("#m_frac")) q("#m_frac").addEventListener("change",fracPick);
   /* busca pelo lote */
   const escolherLote=aid=>{ const x=elig.find(z=>z.id===aid); if(!x) return; q("#m_am").value=x.id; q("#m_lotq").value=x.lote; q("#m_lotsug").hidden=true; q("#m_lotsug").innerHTML=""; upd(); };
   const buscaLote=()=>{ const t=norm(q("#m_lotq").value).replace(/\s/g,""); const box=q("#m_lotsug");
@@ -1713,6 +1799,7 @@ function formMov(id, tipo, clienteId){
   upd();
   m.form.onsubmit=async e=>{
     e.preventDefault(); const err=q("#m_err"); if(!r){ err.textContent="Digite o lote e escolha a amostra."; q("#m_lotq").focus(); return; }
+    let RW=null; if(!out){ const v=RE.validate(); if(v.err){ err.textContent=v.err; return; } if(!v.rows.length){ err.textContent="Inclua pelo menos uma linha com o ID da amostra que entra."; return; } RW=v.rows; q("#m_qtd").value=RW.reduce((s,x)=>s+x.n,0); }
     const qtd=Number(q("#m_qtd").value.replace(",",".")); const resp=q("#m_resp").value; const data=q("#m_data").value;
     if(!(qtd>0)){ err.textContent="Informe uma quantidade maior que zero."; return; }
     if(out&&qtd>r.disp+1e-9){ err.textContent=r.pendOut?`A quantidade passa do disponível (${nf(r.disp)}): ${nf(r.pendOut)} já está${r.pendOut===1?"":"o"} reservada${r.pendOut===1?"":"s"} em saídas aguardando confirmação.`:`A quantidade passa do saldo do lote (${nf(r.saldo)}).`; return; }
@@ -1731,9 +1818,10 @@ function formMov(id, tipo, clienteId){
     const extra=cli?{clienteId:cli.id,cliente:cli.nome}:{};
     const io=idsOf(r);
     const est=estKg();
-    const kgMov= out ? Math.round(((kgVal!=null)?kgVal:est)*1000)/1000 : (()=>{ const ku=Number((q("#m_kgun")||{}).value)||0; return ku?Math.round(ku*parseIds(q("#m_ids").value).length*1000)/1000:0; })();
-    const idsTxt= out ? tokens() : q("#m_ids").value.trim();
-    const plano= out ? {sel:{...selQ},kgVal:kgVal} : {typed:parseIds(q("#m_ids").value),ku:Number((q("#m_kgun")||{}).value)||0};
+    const kgMov= out ? Math.round(((kgVal!=null)?kgVal:est)*1000)/1000 : r3(RW.reduce((s,x)=>s+x.kg,0));
+    const idsTxt= out ? tokens() : RW.map(linhaTxt).join(", ");
+    const plano= out ? {sel:{...selQ},kgVal:kgVal} : {rows:RW};
+    const fm=!out&&q("#m_frac")?S.movs.find(x=>x.id===q("#m_frac").value):null; if(fm) extra.fracId=fm.fracId;
     const stNovo=precisaConfirmar(tipo)?"pendente":"confirmada";
     const movDoc={amostraId:r.id,produto:r.produto,lote:r.lote,tipo,qtd,data,motivo:q("#m_mot").value,destino:q("#m_dest")?q("#m_dest").value:"",responsavel:resp,obs:q("#m_obs").value.trim(),ids:idsTxt,kg:kgMov,plano,status:stNovo,...(cat?{categoria:cat}:{}),...extra};
     let movId=null;
@@ -1741,6 +1829,78 @@ function formMov(id, tipo, clienteId){
     const ok=await guard(async()=>{ movId=await store.addMov(movDoc); }, stNovo==="pendente"?`${nomeT} enviada para confirmação`:`${nomeT} registrada`);
     if(ok&&movId&&fotos.length){ const nf0=fotos.length; toast(`Salvando ${nf0} foto${nf0===1?"":"s"}…`); salvarFotos({id:movId,...movDoc},fotos.splice(0)).then(n=>toast(n===nf0?`${n} foto${n===1?"":"s"} de evidência salva${n===1?"":"s"}`:`Só ${n} de ${nf0} fotos foram salvas. Tente de novo em Evidências.`)); }
     if(ok&&stNovo==="confirmada") await guard(()=>aplicarMov({id:movId,...movDoc}, tipo==="descarte"&&qtd>=r.saldo-1e-9));
+  };
+}
+
+/* Fracionamento: um volume (ex.: saco valvulado) é aberto para o laboratório interno; o restante volta em frascos */
+function formFrac(id){
+  if(S.readonly) return; const R=rows(); const r=R.find(x=>x.id===id);
+  if(!r||r.disp<=0||r.descartada){ toast("Este lote não tem saldo disponível para fracionar."); return; }
+  const io=idsOf(r), RES=reservas(r.id); const unOf=i=>(io.q&&io.q[i])||1; const avail=i=>Math.max(0,unOf(i)-(RES[i]||0)); const kgU=i=>(Number(io.kg[i])||0)/unOf(i);
+  const livres=io.ids.filter(i=>avail(i)>0); const embF=EMB().find(x=>/frasco/i.test(x))||"";
+  const body=`<div class="ref full"><div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span> · ${esc(r.local||"sem local")}</div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.disp)}</b> <span class="sub">${esc(r.unidade||"un")} disponível</span></div></div>
+   <p class="sub full" style="margin:0">O volume aberto sai do estoque para análise no laboratório interno. O que sobrar volta ao estoque em frascos, cada um com o tipo de embalagem. O app registra uma saída e uma entrada ligadas entre si.</p>
+   <div class="field full"><label>1 · Volume aberto para análise *</label>
+     ${livres.length?`<div class="chips" id="fr_chips" style="margin-bottom:6px"><span class="sub" style="width:100%">Toque no ID que foi aberto</span>${livres.map(i=>`<button type="button" class="chip frc" data-id="${esc(i)}" style="padding:3px 10px;cursor:pointer;font-family:var(--mono);border:1px solid var(--line)">${esc(idLabel(i,io.q,io.kg,io.emb))}</button>`).join("")}</div><div id="fr_selbox" style="display:flex;flex-direction:column;gap:6px"></div>`:`<span class="sub">Este lote não tem IDs registrados. Informe só a quantidade e o peso.</span>`}</div>
+   <div class="field"><label for="fr_qtd">Volumes abertos *</label><input id="fr_qtd" type="number" min="1" step="1" inputmode="numeric"${livres.length?" readonly":` value="1"`}></div>
+   <div class="field"><label for="fr_kg">Peso aberto (kg)</label><input id="fr_kg" inputmode="decimal" autocomplete="off" placeholder="ex.: 25,000" style="font-family:var(--mono)"></div>
+   <div class="field full"><label>2 · Frascos que voltam ao estoque</label>
+     <label class="lchk" style="border:1px solid var(--line);border-radius:10px;margin-bottom:8px;text-transform:none;letter-spacing:normal;font-weight:400;font-size:14px;color:var(--ink)"><input type="checkbox" id="fr_depois"><span>Registrar os frascos depois <span class="sub">(a análise ainda está em andamento)</span></span></label>
+     <div id="fr_rowsw"><div class="sub" style="margin:0 0 6px">Uma linha por ID e embalagem. Pode repetir o ID do saco; se a embalagem for diferente, o app guarda separado.</div>${rowsBox("fr","+ Adicionar frascos")}</div></div>
+   <div class="full frbal" id="fr_bal"></div>
+   <div class="field"><label for="fr_data">Data *</label><input id="fr_data" type="date" value="${hoje()}"></div>
+   <div class="field"><label for="fr_resp">Responsável *</label><select id="fr_resp">${opts(S.cfg.analistas,lastResp(),"Selecione")}</select></div>
+   <div class="field full"><label for="fr_obs">Observação</label><input id="fr_obs" placeholder="ex.: nº da análise, parâmetros"></div>
+   ${fotoBox([["preparo","Fotos do fracionamento"]])}
+   <div class="formerr full" id="fr_err"></div>`;
+  const m=modal("Fracionar amostra",body,`<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary">Registrar fracionamento</button>`,true);
+  const q=s=>m.ov.querySelector(s); const fotos=bindFotoBox(m.ov);
+  let selQ={};
+  const selUn=()=>Object.values(selQ).reduce((s,n)=>s+n,0);
+  const est=()=>r3(Object.keys(selQ).reduce((s,i)=>s+kgU(i)*selQ[i],0));
+  const kgOut=()=>{ const t=q("#fr_kg").value.trim(); return t?parseKg(t):est(); };
+  const bal=()=>{ const b=q("#fr_bal"); const ko=kgOut(); const depois=q("#fr_depois").checked; const t=RE?RE.tot():{n:0,kg:0};
+    b.innerHTML=depois?`<span>Sai <b>${fkg(ko||0)} kg</b></span><span>Os frascos ficam aguardando: registre depois em <b>Detalhes</b> do lote ou no aviso 🧪 do estoque.</span>`
+      :`<span>Sai <b>${fkg(ko||0)} kg</b></span><span>Volta <b>${fkg(t.kg)} kg</b> em ${t.n} frasco${t.n===1?"":"s"}</span>${ko!=null&&ko>0&&t.kg<=ko?`<span>Usado na análise <b>${fkg(ko-t.kg)} kg</b></span>`:""}${ko&&t.kg>ko?`<span style="color:var(--bad)">Volta mais peso do que saiu. Confira os pesos.</span>`:""}`; };
+  const RE=rowEditor(m.ov,"fr",{emb0:embF,sumLabel:"Voltam",un:()=>"frasco(s)",onChange:()=>bal()});
+  const paint=()=>{ const box=q("#fr_selbox"); if(box) box.innerHTML=Object.keys(selQ).map(i=>{ const un=unOf(i), n=selQ[i];
+      return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--sunk);border-radius:6px;padding:6px 10px"><b style="font-family:var(--mono)">${esc(i)}</b>${io.emb[i]&&!i.endsWith(`(${io.emb[i]})`)?`<span class="sub">${esc(io.emb[i])}</span>`:""}
+        ${un>1?`<button type="button" class="btn sm frm" data-id="${esc(i)}" aria-label="Menos um volume">−</button><b style="font-family:var(--mono)">${n}</b><button type="button" class="btn sm frp" data-id="${esc(i)}" aria-label="Mais um volume">+</button><span class="sub">de ${avail(i)}</span>`:`<span class="sub">1 volume</span>`}
+        <span class="sub" style="margin-left:auto">${kgU(i)?`${fkg(kgU(i)*n)} kg`:"sem peso registrado"}</span><button type="button" class="btn sm frx" data-id="${esc(i)}" aria-label="Tirar ${esc(i)}">×</button></div>`; }).join("");
+    m.ov.querySelectorAll(".frc").forEach(b=>{ const on=!!selQ[b.dataset.id]; b.style.background=on?"var(--accent)":"var(--sunk)"; b.style.color=on?"var(--accent-ink)":"var(--ink)"; });
+    if(livres.length) q("#fr_qtd").value=selUn()||"";
+    const kin=q("#fr_kg"); if(!kin.dataset.touched) kin.value=est()?String(est()).replace(".",","):"";
+    if(RE.L.length===1&&!RE.L[0].id&&Object.keys(selQ).length){ const k0=Object.keys(selQ)[0]; RE.L[0].id=baseId(k0,io.emb[k0]); RE.draw(); }
+    bal(); };
+  m.ov.addEventListener("click",ev=>{ const c=ev.target.closest(".frc"); if(c){ const i=c.dataset.id; if(selQ[i]) delete selQ[i]; else selQ[i]=1; paint(); return; }
+    const p=ev.target.closest(".frp"), mi=ev.target.closest(".frm"), x=ev.target.closest(".frx");
+    if(p){ selQ[p.dataset.id]=Math.min(avail(p.dataset.id),selQ[p.dataset.id]+1); paint(); } else if(mi){ selQ[mi.dataset.id]=Math.max(1,selQ[mi.dataset.id]-1); paint(); } else if(x){ delete selQ[x.dataset.id]; paint(); } });
+  q("#fr_kg").addEventListener("input",ev=>{ ev.target.dataset.touched=ev.target.value.trim()?"1":""; bal(); });
+  q("#fr_depois").addEventListener("change",ev=>{ q("#fr_rowsw").hidden=ev.target.checked; bal(); });
+  if(livres.length===1&&unOf(livres[0])===1){ selQ[livres[0]]=1; }
+  paint();
+  m.form.onsubmit=async e=>{ e.preventDefault(); const err=q("#fr_err");
+    const qtd=Number(q("#fr_qtd").value); const resp=q("#fr_resp").value, data=q("#fr_data").value, depois=q("#fr_depois").checked;
+    if(livres.length&&!selUn()){ err.textContent="Toque no ID do volume que foi aberto."; return; }
+    if(!(qtd>0)){ err.textContent="Informe quantos volumes foram abertos."; return; }
+    if(qtd>r.disp+1e-9){ err.textContent=`A quantidade passa do disponível (${nf(r.disp)}).`; return; }
+    const kt=q("#fr_kg").value.trim(), kv=kt?parseKg(kt):null; if(kt&&kv==null){ err.textContent="O peso aberto não é um número válido. Use, por exemplo, 25,000."; return; }
+    let RW=[]; if(!depois){ const v=RE.validate(); if(v.err){ err.textContent=v.err; return; } RW=v.rows; if(!RW.length){ err.textContent="Inclua os frascos que voltam ao estoque, ou marque “Registrar os frascos depois”."; return; } }
+    if(!resp){ err.textContent="Selecione o responsável."; return; } if(!data){ err.textContent="Informe a data."; return; }
+    LS.set("resp",resp); m.close();
+    const fracId=uid(); const obs=q("#fr_obs").value.trim(); const kOut=r3(kv!=null?kv:est());
+    const tok=Object.keys(selQ).map(i=>unOf(i)>1?`${i}x${selQ[i]}`:i).join(", ");
+    const base={amostraId:r.id,produto:r.produto,lote:r.lote,data,responsavel:resp,obs,fracId,destino:""};
+    const sDoc={...base,tipo:"saida",categoria:"Análises",motivo:"Fracionamento",qtd,ids:tok,kg:kOut,plano:{sel:{...selQ},kgVal:kv},status:precisaConfirmar("saida")?"pendente":"confirmada"};
+    const eDoc=RW.length?{...base,tipo:"entrada",motivo:"Retorno do fracionamento",qtd:RW.reduce((s,x)=>s+x.n,0),ids:RW.map(linhaTxt).join(", "),kg:r3(RW.reduce((s,x)=>s+x.kg,0)),plano:{rows:RW},status:precisaConfirmar("entrada")?"pendente":"confirmada"}:null;
+    let sId=null;
+    const ok=await guard(async()=>{ sId=await store.addMov(sDoc); if(eDoc) await store.addMov(eDoc,true); },
+      sDoc.status==="pendente"?"Fracionamento enviado para confirmação":eDoc?"Fracionamento registrado":"Fracionamento registrado · registre os frascos depois");
+    if(ok&&sId&&fotos.length){ const n0=fotos.length; salvarFotos({id:sId,...sDoc},fotos.splice(0)).then(n=>toast(n===n0?`${n} foto${n===1?"":"s"} salva${n===1?"":"s"}`:`Só ${n} de ${n0} fotos foram salvas.`)); }
+    if(ok){ const a=S.amostras.find(x=>x.id===r.id); if(!a) return; const io0=idsOf(a); let st=null;
+      if(sDoc.status==="confirmada") st=aplicarPlano(io0,sDoc)||st;
+      if(eDoc&&eDoc.status==="confirmada"){ const cur=st||{ids:io0.ids,q:io0.q,kg:io0.kg,emb:io0.emb}; st=aplicarPlano(cur,eDoc)||st; }
+      if(st) await guard(()=>store.updateAmostra(a.id,patchIds(st,io0.conf,data))); }
   };
 }
 
@@ -1816,20 +1976,20 @@ function reclassificar(id){
     await guard(async()=>{
       // 1) lote de destino
       let dl=destLot(); let destId;
-      if(dl){ destId=dl.id; const d0=idsOf(dl); const ids=[...d0.ids], qq={...d0.q}, kg={...d0.kg};
-        for(const x of moved){ if(ids.includes(x.i)){ qq[x.i]=((qq[x.i])||1)+x.n; kg[x.i]=Math.round(((Number(kg[x.i])||0)+x.kg)*1000)/1000; } else { ids.push(x.i); if(x.n>1) qq[x.i]=x.n; if(x.kg) kg[x.i]=x.kg; } }
-        if(moved.length) await store.updateAmostra(destId,{ids,idsQ:qq,idsKg:kg,idsConf:d0.conf||"",atualizadoEm:data}); }
-      else { const ids=moved.map(x=>x.i), qq={}, kg={}; moved.forEach(x=>{ if(x.n>1) qq[x.i]=x.n; if(x.kg) kg[x.i]=x.kg; });
+      if(dl){ destId=dl.id; const d0=idsOf(dl); const ids=[...d0.ids], qq={...d0.q}, kg={...d0.kg}, em={...d0.emb};
+        for(const x of moved){ if(ids.includes(x.i)){ qq[x.i]=((qq[x.i])||1)+x.n; kg[x.i]=Math.round(((Number(kg[x.i])||0)+x.kg)*1000)/1000; } else { ids.push(x.i); if(x.n>1) qq[x.i]=x.n; if(x.kg) kg[x.i]=x.kg; } if(io.emb[x.i]) em[x.i]=io.emb[x.i]; }
+        if(moved.length) await store.updateAmostra(destId,{ids,idsQ:qq,idsKg:kg,idsEmb:em,idsConf:d0.conf||"",atualizadoEm:data}); }
+      else { const ids=moved.map(x=>x.i), qq={}, kg={}, em={}; moved.forEach(x=>{ if(x.n>1) qq[x.i]=x.n; if(x.kg) kg[x.i]=x.kg; if(io.emb[x.i]) em[x.i]=io.emb[x.i]; });
         destId=await store.addAmostra({produto:dest,mapa:mapaDe(dest),codigo:codigoDe(dest),lote:r.lote,tipo:r.tipo||"",conteudo:r.conteudo||"",fabricacao:r.fabricacao||"",validade:r.validade||"",unidade:r.unidade||"un",local:r.local||"",responsavel:resp,
-          obs:`Reclassificado de ${r.produto} (lote ${r.lote}) em ${fmtD(data)}.`,origemReclass:r.id,...(moved.length?{ids,idsQ:qq,idsKg:kg}:{})},0,resp,data); }
+          obs:`Reclassificado de ${r.produto} (lote ${r.lote}) em ${fmtD(data)}.`,origemReclass:r.id,...(moved.length?{ids,idsQ:qq,idsKg:kg,idsEmb:em}:{})},0,resp,data); }
       // 2) movimentações ligadas
       const base={lote:r.lote,qtd,data,motivo:mot,responsavel:resp,ids:tok,kg:kgMov,...(cli?{clienteId:cli.id,cliente:cli.nome,clienteReclass:true}:{})};
       await store.addMov({...base,amostraId:r.id,produto:r.produto,tipo:"reclass_out",destino:dest,reclassPara:destId,obs:`Para ${dest}${obs?". "+obs:""}`});
       await store.addMov({...base,amostraId:destId,produto:dest,tipo:"reclass_in",destino:"",reclassDe:r.id,obs:`De ${r.produto}${obs?". "+obs:""}`});
       // 3) tira os volumes da origem
-      if(moved.length){ let ids=[...io.ids], qq={...io.q}, kg={...io.kg};
-        for(const x of moved){ const un=unOf(x.i); if(x.n>=un){ ids=ids.filter(y=>y!==x.i); delete qq[x.i]; delete kg[x.i]; } else { const rest=un-x.n; if(rest>1) qq[x.i]=rest; else delete qq[x.i]; kg[x.i]=Math.max(0,Math.round(((Number(kg[x.i])||0)-x.kg)*1000)/1000); } }
-        await store.updateAmostra(r.id,{ids,idsQ:qq,idsKg:kg,idsConf:io.conf||"",atualizadoEm:data}); }
+      if(moved.length){ let ids=[...io.ids], qq={...io.q}, kg={...io.kg}, em={...io.emb};
+        for(const x of moved){ const un=unOf(x.i); if(x.n>=un){ ids=ids.filter(y=>y!==x.i); delete qq[x.i]; delete kg[x.i]; delete em[x.i]; } else { const rest=un-x.n; if(rest>1) qq[x.i]=rest; else delete qq[x.i]; kg[x.i]=Math.max(0,Math.round(((Number(kg[x.i])||0)-x.kg)*1000)/1000); } }
+        await store.updateAmostra(r.id,{ids,idsQ:qq,idsKg:kg,idsEmb:em,idsConf:io.conf||"",atualizadoEm:data}); }
       else await store.updateAmostra(r.id,{atualizadoEm:data});
     },"Reclassificação registrada");
   };
@@ -1887,7 +2047,8 @@ function ajustarLote(id){
     const t=L.reduce((s,x)=>s+x.n,0);
     const conf=t===novo?"":`Após ajuste: os IDs somam ${t} volume(s); o saldo do lote é ${novo}.`;
     const before=io.ids.map(i=>idLabel(i,io.q,io.kg)).join(", ")||"nenhum", after=ids.map(i=>idLabel(i,qq,kg)).join(", ")||"nenhum";
-    const ok=await guard(()=>store.updateAmostra(r.id,{ids,idsQ:qq,idsKg:kg,idsConf:conf,atualizadoEm:hoje()}));
+    const em={}; ids.forEach(i=>{ if(io.emb[i]) em[i]=io.emb[i]; });
+    const ok=await guard(()=>store.updateAmostra(r.id,{ids,idsQ:qq,idsKg:kg,idsEmb:em,idsConf:conf,atualizadoEm:hoje()}));
     if(!ok) return;
     const diff=novo-r.saldo;
     const idsChanged=before!==after;
@@ -1903,14 +2064,18 @@ function historico(id){
   const info=[["Registro MAPA",r.mapa],["Código interno",r.codigo],["Tipo",r.tipo],["Conteúdo",r.conteudo],["Fabricação",fmtD(r.fabricacao)],["Validade",fmtD(r.validade)],["Localização",r.local],["Cadastrado por",r.responsavel],["Observação",r.obs]].filter(x=>x[1]&&x[1]!=="—");
   const io=idsOf(r);
   const body=`<div class="ref full"><div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span></div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"")}</span></div></div>
-   <div class="full"><div class="sub" style="margin-bottom:4px">IDs em estoque (${io.ids.length})${io.ids.length?` · peso ${fkg(kgOf(r))} kg`:""}${io.conf?` · <span style="color:var(--warn)">conferir: ${esc(io.conf)}</span>`:""}</div>${io.ids.length?`<div class="chips">${io.ids.map(i=>`<span class="chip" style="padding:3px 10px;font-family:var(--mono)">${esc(idLabel(i,io.q,io.kg))}</span>`).join("")}</div>`:`<span class="sub">Nenhum ID registrado.</span>`}</div>
+   <div class="full"><div class="sub" style="margin-bottom:4px">IDs em estoque (${io.ids.length})${io.ids.length?` · peso ${fkg(kgOf(r))} kg`:""}${io.conf?` · <span style="color:var(--warn)">conferir: ${esc(io.conf)}</span>`:""}</div>${io.ids.length?`<div class="chips">${io.ids.map(i=>`<span class="chip" style="padding:3px 10px;font-family:var(--mono)">${esc(idLabel(i,io.q,io.kg,io.emb))}</span>`).join("")}</div>`:`<span class="sub">Nenhum ID registrado.</span>`}</div>
+   ${fracAbertos(id).map(f=>`<div class="full fropen"><span style="flex:1;min-width:220px">🧪 <b>Fracionamento de ${fmtD(f.data)}</b> · saiu ${esc(f.ids||nf(f.qtd)+" volume(s)")}${f.kg?` · ${fkg(f.kg)} kg`:""}${f.status==="pendente"?" · aguardando confirmação":""}<br><span class="sub">Os frascos que voltaram ao estoque ainda não foram registrados.</span></span>${S.readonly?"":`<button type="button" class="btn sm primary hfr" data-id="${f.id}">Registrar frascos</button>`}${FULL()&&!S.readonly?`<button type="button" class="btn sm hff" data-id="${f.id}" title="Use quando todo o conteúdo foi usado na análise">Nada voltou</button>`:""}</div>`).join("")}
    <div class="full" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">${info.map(([k,v])=>`<div><div class="sub">${k}</div><div>${esc(v)}</div></div>`).join("")}</div>
    ${(r.locaisHist||[]).length?`<div class="full"><div class="sub" style="margin-bottom:4px">Mudanças de local</div><div class="tablebox"><table><thead><tr><th>Data</th><th>De</th><th>Para</th><th>Responsável</th><th>Obs.</th></tr></thead><tbody>${r.locaisHist.slice().reverse().map(h=>`<tr><td class="mono">${fmtD(h.data)}</td><td>${esc(h.de||"—")}</td><td><b>${esc(h.para)}</b></td><td>${esc(h.resp||h.por||"")}</td><td class="sub">${esc(h.obs||"")}</td></tr>`).join("")}</tbody></table></div></div>`:""}
    <div class="full tablebox"><table><thead><tr><th>Data</th><th>Tipo</th><th class="num">Qtd</th><th>Motivo</th><th>Destino</th><th>Responsável</th><th>Obs.</th></tr></thead><tbody>
    ${M.map(m=>`<tr><td class="mono">${fmtD(m.data)}</td><td class="mv-${m.tipo}"><b>${MV_LABEL[m.tipo]||esc(m.tipo)}</b></td><td class="num">${Number(m.qtd)===0?"":((m.tipo==="entrada"||m.tipo==="reclass_in"||(m.tipo==="ajuste"&&m.qtd>0))?"+":"−")}${nf(Math.abs(m.qtd))}</td><td>${esc(m.motivo)}</td><td>${esc(m.destino)}</td><td>${esc(m.responsavel)}</td><td class="sub">${esc(m.obs||"")}${m.ids?` · ID ${esc(m.ids)}`:""}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">Sem movimentações.</td></tr>`}
    </tbody></table></div>`;
   const ro=S.readonly;
-  const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&!r.descartada?`<button type="button" class="btn" id="h_lc">Mudar local</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
+  const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&!r.descartada?`<button type="button" class="btn" id="h_lc">Mudar local</button>`:""}${!ro&&r.disp>0&&!r.descartada?`<button type="button" class="btn" id="h_fr">Fracionar</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
+  const fr=m.ov.querySelector("#h_fr"); if(fr) fr.onclick=()=>{ m.close(); formFrac(id); };
+  m.ov.addEventListener("click",ev=>{ const a=ev.target.closest(".hfr"), b=ev.target.closest(".hff"); if(a){ m.close(); formMov(id,"entrada",null,{fracId:(S.movs.find(x=>x.id===a.dataset.id)||{}).fracId}); }
+    if(b){ m.close(); fecharFrac(b.dataset.id); } });
   const lc=m.ov.querySelector("#h_lc"); if(lc) lc.onclick=()=>{ m.close(); mudarLocal([id]); };
   const ed=m.ov.querySelector("#h_ed"); if(ed) ed.onclick=()=>{ m.close(); formAmostra(S.amostras.find(x=>x.id===id)); };
   const rt=m.ov.querySelector("#h_rt"); if(rt) rt.onclick=()=>{ m.close(); formMov(id,"saida"); };
