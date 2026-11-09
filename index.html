@@ -2154,19 +2154,57 @@ function exportMenu(){
     <div class="full" id="ex_pdfopts" style="display:flex;flex-direction:column;gap:10px">
       <div><div class="sub" style="margin-bottom:6px">O que entra no PDF</div><div class="lchkbox" style="max-height:none">${sec.map(([k,l,on])=>`<label class="lchk"><input type="checkbox" id="ex_${k}"${on?" checked":""}><span>${l}</span></label>`).join("")}</div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="field"><label for="ex_de">Movimentações de</label><input id="ex_de" type="date" value="${de0}"></div><div class="field"><label for="ex_ate">até</label><input id="ex_ate" type="date" value="${hoje()}"></div></div>
-      <div class="field"><label for="ex_prod">Produto <span class="thu">opcional</span></label><input id="ex_prod" list="dlex" placeholder="Todos os produtos" autocomplete="off">${dl("dlex",S.amostras.map(a=>a.produto))}</div></div>
+      <label class="lchk" style="border:1px solid var(--line);border-radius:10px;text-transform:none;letter-spacing:normal;font-weight:400;font-size:14px;color:var(--ink)"><input type="checkbox" id="ex_tudo"><span>Todo o histórico, sem limite de datas <span class="sub">(bom para o relatório de um lote)</span></span></label></div>
+    <div class="full" style="display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px">
+      <div><b style="font-size:14px">Filtrar produto e lotes</b> <span class="sub">(opcional: sem filtro, sai tudo)</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <div class="field"><label for="ex_prod">Produto</label><input id="ex_prod" list="dlex" placeholder="Todos os produtos" autocomplete="off">${dl("dlex",S.amostras.map(a=>a.produto))}</div>
+        <div class="field"><label for="ex_lq">Buscar lote</label><input id="ex_lq" placeholder="Digite o lote" autocomplete="off" style="font-family:var(--mono)"></div></div>
+      <div class="lchkbox" id="ex_lots" style="max-height:230px;overflow:auto"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="sub" id="ex_lsum" style="flex:1;min-width:180px"></span><button type="button" class="btn sm" id="ex_lall">Marcar os listados</button><button type="button" class="btn sm" id="ex_lnone">Limpar</button></div></div>
     <div class="formerr full" id="ex_err"></div>`,
     `<button type="button" class="btn" data-close>Cancelar</button><button type="submit" class="btn primary" id="ex_go">Baixar PDF</button>`);
   const q=x=>md.ov.querySelector(x);
   const sync=()=>{ const pdf=q('input[name="ex_fmt"]:checked').value==="pdf"; q("#ex_pdfopts").hidden=!pdf; q("#ex_go").textContent=pdf?"Baixar PDF":"Baixar Excel"; };
   md.ov.querySelectorAll('input[name="ex_fmt"]').forEach(r=>r.addEventListener("change",sync)); sync();
+  /* lotes */
+  const SEL=new Set(); let autoTudo=false; const R=rows();
+  const listados=()=>{ const pf=norm(q("#ex_prod").value.trim()), lq=norm(q("#ex_lq").value.trim()); if(!pf&&!lq) return null;
+    return R.filter(r=>(!pf||norm(r.produto).includes(pf))&&(!lq||norm(r.lote).includes(lq))).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(b.fabricacao||"").localeCompare(String(a.fabricacao||""))); };
+  const drawLots=()=>{ const L=listados(), box=q("#ex_lots"); const pf=q("#ex_prod").value.trim();
+    const extra=R.filter(r=>SEL.has(r.id)&&!(L||[]).includes(r)); const show=[...extra,...(L||[])].slice(0,300);
+    box.innerHTML=show.length?show.map(r=>`<label class="lchk"><input type="checkbox" class="exl" value="${r.id}"${SEL.has(r.id)?" checked":""}><span style="flex:1"><b style="font-family:var(--mono)">${esc(r.lote)}</b>${pf&&L&&L.includes(r)?"":` · ${esc(r.produto)}`}<br><span class="sub">${r.descartada?"Descartada":r.saldo>0?`${nf(r.saldo)} ${esc(r.unidade||"un")} · ${fkg(kgOf(r))} kg`:"Sem saldo"} · validade ${fmtD(r.validade)} · ${esc(ST_LABEL[r.st]||"")}</span></span></label>`).join("")
+      :`<div class="sub" style="padding:10px 12px">${L?"Nenhum lote encontrado.":"Escolha um produto ou digite o lote para listar os lotes."}</div>`;
+    const n=SEL.size; q("#ex_lsum").innerHTML=n?`<b>${n}</b> lote${n===1?"":"s"} marcado${n===1?"":"s"}: o relatório sai só ${n===1?"dele":"deles"}.`:(pf?`Nenhum lote marcado: saem todos os lotes de <b>${esc(pf)}</b>.`:"Nenhum lote marcado: saem todos os lotes.");
+    q("#ex_lall").disabled=!L||!L.length; q("#ex_lnone").disabled=!n; };
+  q("#ex_lots").addEventListener("change",ev=>{ const c=ev.target.closest(".exl"); if(!c) return; if(c.checked) SEL.add(c.value); else SEL.delete(c.value);
+    if(SEL.size&&!autoTudo){ autoTudo=true; q("#ex_tudo").checked=true; tudoSync(); } drawLots(); });
+  ["#ex_prod","#ex_lq"].forEach(k=>{ q(k).addEventListener("input",drawLots); q(k).addEventListener("change",drawLots); });
+  q("#ex_lq").addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); const L=listados(); if(L&&L.length===1){ SEL.add(L[0].id); drawLots(); } } });
+  q("#ex_lall").onclick=()=>{ (listados()||[]).forEach(r=>SEL.add(r.id)); if(!autoTudo){ autoTudo=true; q("#ex_tudo").checked=true; tudoSync(); } drawLots(); };
+  q("#ex_lnone").onclick=()=>{ SEL.clear(); drawLots(); };
+  const tudoSync=()=>{ const t=q("#ex_tudo").checked; q("#ex_de").disabled=t; q("#ex_ate").disabled=t; };
+  q("#ex_tudo").addEventListener("change",()=>{ autoTudo=true; tudoSync(); });
+  drawLots();
   md.form.onsubmit=e=>{ e.preventDefault(); const err=q("#ex_err");
-    if(q('input[name="ex_fmt"]:checked').value==="xlsx"){ md.close(); exportar(); return; }
-    const o={de:q("#ex_de").value,ate:q("#ex_ate").value,prod:q("#ex_prod").value.trim()}; sec.forEach(([k])=>o[k]=q("#ex_"+k).checked);
+    const pv=q("#ex_prod").value.trim(); const ids=SEL.size?[...SEL]:null;
+    if(pv&&!ids&&!R.some(r=>norm(r.produto).includes(norm(pv)))){ err.textContent="Nenhum lote encontrado para esse produto."; return; }
+    const filtro={prod:ids?"":pv,ids,lotes:ids?R.filter(r=>SEL.has(r.id)).map(r=>r.lote):[]};
+    if(q('input[name="ex_fmt"]:checked').value==="xlsx"){ md.close(); exportar(filtro); return; }
+    const tudo=q("#ex_tudo").checked;
+    const o={...filtro,de:tudo?"":q("#ex_de").value,ate:tudo?"":q("#ex_ate").value}; sec.forEach(([k])=>o[k]=q("#ex_"+k).checked);
     if(!sec.some(([k])=>o[k])){ err.textContent="Marque pelo menos uma parte do relatório."; return; }
     if(o.mov&&o.de&&o.ate&&o.ate<o.de){ err.textContent="A data final do período é anterior à inicial."; return; }
     md.close(); gerarPDF(o); };
 }
+/* filtro do relatório: lotes marcados (ids) ou parte do nome do produto */
+function filtroExp(f){ f=f||{}; const set=f.ids&&f.ids.length?new Set(f.ids):null; const pf=f.prod?norm(f.prod):"";
+  const okA=r=>set?set.has(r.id):(!pf||norm(r.produto).includes(pf));
+  const okM=m=>set?set.has(m.amostraId):(!pf||norm(m.produto).includes(pf));
+  const selR=set?rows().filter(r=>set.has(r.id)):[]; const lotes=selR.map(r=>r.lote);
+  const okL=x=>set?selR.some(r=>r.lote===x.lote&&norm(r.produto)===norm(x.produto||r.produto)):(!pf||norm(x.produto||"").includes(pf));
+  const txt=set?(lotes.length===1?`lote ${lotes[0]}`:`${lotes.length} lotes: ${lotes.slice(0,6).join(", ")}${lotes.length>6?"…":""}`):(f.prod?`produto: ${f.prod}`:"");
+  return {set,okA,okM,okL,txt,lotes,ativo:!!(set||pf)}; }
 const PDF_LIBS=["https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js","https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"];
 const loadScript=src=>new Promise((ok,ko)=>{ const t=document.createElement("script"); t.src=src; t.onload=ok; t.onerror=ko; document.head.appendChild(t); });
 async function gerarPDF(o){
@@ -2177,11 +2215,11 @@ async function gerarPDF(o){
   const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
   const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=10;
   const C={ink:[15,30,54],acc:[29,90,150],mut:[107,122,140],line:[214,222,232],zeb:[245,247,250],bad:[183,45,35],warn:[166,104,0],ok:[46,125,50],gold:[245,197,24]};
-  const pf=o.prod?norm(o.prod):""; const okP=x=>!pf||norm(x.produto).includes(pf);
-  const R=rows().filter(okP); const ativas=R.filter(r=>r.saldo>0&&!r.descartada).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(a.validade).localeCompare(String(b.validade)));
+  const FX=filtroExp(o); const okP=FX.okA;
+  const R=rows().filter(FX.okA); const ativas=R.filter(r=>FX.set?true:(r.saldo>0&&!r.descartada)).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(a.validade).localeCompare(String(b.validade)));
   const per=m=>(!o.de||String(m.data)>=o.de)&&(!o.ate||String(m.data)<=o.ate);
-  const MV=S.movs.filter(m=>okP(m)&&per(m)).sort((a,b)=>String(a.data).localeCompare(String(b.data))||String(a.criadoEm).localeCompare(String(b.criadoEm)));
-  const per_txt=`${o.de?fmtD(o.de):"início"} a ${o.ate?fmtD(o.ate):"hoje"}`;
+  const MV=S.movs.filter(m=>FX.okM(m)&&per(m)).sort((a,b)=>String(a.data).localeCompare(String(b.data))||String(a.criadoEm).localeCompare(String(b.criadoEm)));
+  const per_txt=!o.de&&!o.ate?"todo o histórico":`${o.de?fmtD(o.de):"início"} a ${o.ate?fmtD(o.ate):"hoje"}`;
   const top=30; let y=top;
   const T=(txt,x,yy,sz,col,bold,al)=>{ doc.setFont("helvetica",bold?"bold":"normal"); doc.setFontSize(sz); doc.setTextColor(...col); doc.text(String(txt),x,yy,al?{align:al}:undefined); };
   const titulo=(t,sub)=>{ if(y>H-45){ doc.addPage(); y=top; } T(t,M,y,12.5,C.ink,true); if(sub) T(sub,M,y+5,8.5,C.mut,false); y+=sub?9:5; };
@@ -2192,7 +2230,7 @@ async function gerarPDF(o){
   const stCor=st=>st==="vencida"?C.bad:st==="avencer"?C.warn:st==="ok"?C.ok:C.mut;
 
   if(o.res){
-    titulo("Resumo do estoque",`Situação em ${fmtD(hoje())}${o.prod?` · produto: ${o.prod}`:""}`);
+    titulo("Resumo do estoque",`Situação em ${fmtD(hoje())}${FX.txt?` · ${FX.txt}`:""}`);
     const un=ativas.reduce((s,r)=>s+r.saldo,0), kg=ativas.reduce((s,r)=>s+kgOf(r),0);
     const ent=MV.filter(m=>m.tipo==="entrada"&&ATIVA(m)), sai=MV.filter(m=>(m.tipo==="saida"||m.tipo==="descarte")&&ATIVA(m));
     const K=[["Lotes em estoque",nf(ativas.length),C.acc],["Unidades em estoque",nf(un),C.acc],["Peso em estoque",fkg(kg)+" kg",C.acc],["A vencer",nf(ativas.filter(r=>r.st==="avencer").length),C.warn,`em até ${S.cfg.alerta||60} dias`],["Vencidas com saldo",nf(ativas.filter(r=>r.st==="vencida").length),C.bad],
@@ -2207,9 +2245,9 @@ async function gerarPDF(o){
         tabela(["Tipo de saída","Lançamentos","Unidades","Peso (kg)"],L.map(([c,x])=>[c,nf(x.n),nf(x.q),fkg(x.kg)]),{1:{halign:"right",cellWidth:30},2:{halign:"right",cellWidth:30},3:{halign:"right",cellWidth:30}},{tableWidth:170}); } }
   }
   if(o.est){
-    titulo("Estoque atual",`${ativas.length} lote${ativas.length===1?"":"s"} com saldo · IDs com embalagem e peso`);
+    titulo(FX.set?(ativas.length===1?"Dados do lote":"Dados dos lotes"):"Estoque atual",`${ativas.length} lote${ativas.length===1?"":"s"}${FX.set?"":" com saldo"} · IDs com embalagem e peso`);
     tabela(["Produto","Lote","Tipo","Validade","Situação","Saldo","Peso (kg)","Local","IDs em estoque"],
-      ativas.map(r=>{ const io=idsOf(r); return [r.produto,r.lote,r.tipo||"",fmtD(r.validade),ST_LABEL[r.st]||"",`${nf(r.saldo)} ${r.unidade||"un"}`,fkg(kgOf(r)),r.local||"",io.ids.map(i=>idLabel(i,io.q,io.kg,io.emb)).join("; ")]; }),
+      ativas.map(r=>{ const io=idsOf(r); return [r.produto,r.lote,r.tipo||"",fmtD(r.validade),r.descartada?"Descartada":r.saldo>0?(ST_LABEL[r.st]||""):"Sem saldo",`${nf(r.saldo)} ${r.unidade||"un"}`,fkg(kgOf(r)),r.local||"",io.ids.map(i=>idLabel(i,io.q,io.kg,io.emb)).join("; ")]; }),
       {0:{cellWidth:58},1:{cellWidth:20,fontStyle:"bold"},2:{cellWidth:24},3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:16,halign:"right"},6:{cellWidth:17,halign:"right"},7:{cellWidth:28},8:{cellWidth:"auto",fontSize:6.8}},
       {didParseCell:d=>{ if(d.section==="body"&&d.column.index===4){ const r=ativas[d.row.index]; if(r){ d.cell.styles.textColor=stCor(r.st); d.cell.styles.fontStyle="bold"; } } }});
   }
@@ -2233,7 +2271,7 @@ async function gerarPDF(o){
         if(d.column.index===10&&m.status&&m.status!=="confirmada"){ d.cell.styles.textColor=m.status==="recusada"?C.bad:C.warn; d.cell.styles.fontStyle="bold"; } }});
   }
   if(o.frac){
-    const F=fracAbertos().filter(okP);
+    const F=fracAbertos().filter(FX.okM);
     titulo("Fracionamentos aguardando os frascos","Volumes abertos para o laboratório interno cujo retorno em frascos ainda não foi registrado");
     tabela(["Data","Produto","Lote","Volume aberto","Peso aberto (kg)","Responsável","Situação"],
       F.map(m=>[fmtD(m.data),m.produto,m.lote,m.ids||nf(m.qtd),m.kg?fkg(Number(m.kg)):"",m.responsavel||"",m.status==="pendente"?"Aguardando confirmação":"Confirmada"]),
@@ -2246,21 +2284,22 @@ async function gerarPDF(o){
     if(logo){ try{ doc.addImage(logo,"PNG",M,6,15,15); }catch(e){} }
     const tx=logo?M+19:M;
     T("Relatório de Amostras de Produto Acabado",tx,12,14,C.ink,true);
-    T(`Controle de Qualidade · Meri Pobo${o.prod?` · produto: ${o.prod}`:""}`,tx,17.5,8.5,C.mut,false);
+    T(`Controle de Qualidade · Meri Pobo${FX.txt?` · ${FX.txt}`:""}`.slice(0,150),tx,17.5,8.5,C.mut,false);
     T(`Gerado em ${quando}`,W-M,12,8,C.mut,false,"right"); if(S.myName||S.myId) T(`por ${S.myName||S.myId}`,W-M,16.5,8,C.mut,false,"right");
     doc.setFillColor(...C.gold); doc.rect(M,22,W-2*M,0.9,"F");
     doc.setDrawColor(...C.line); doc.setLineWidth(0.2); doc.line(M,H-10,W-M,H-10);
     T("App Amostras PA · gskmilena-ctrl.github.io/amostras-pa",M,H-5.5,7,C.mut,false);
     T(`Página ${i} de ${n}`,W-M,H-5.5,7,C.mut,false,"right"); }
-  const fname=`Relatorio_Amostras_PA_${hoje().split("-").reverse().join(".")}.pdf`;
+  const fname=`Relatorio_Amostras_PA_${FX.lotes.length===1?"Lote_"+FX.lotes[0].replace(/[^\w.-]+/g,"-")+"_":""}${hoje().split("-").reverse().join(".")}.pdf`;
   await DL.save({filename:fname,data:doc.output("blob")}); toast("Relatório em PDF baixado");
   }catch(e){ console.error(e); toast("Não foi possível gerar o PDF agora."); }
 }
-async function exportar(){
+async function exportar(f){
   if(!window.XLSX){ toast("O gerador de Excel não carregou. Recarregue a página."); return; }
-  const R=rows().sort((a,b)=>a.produto.localeCompare(b.produto,"pt"));
+  const FX=filtroExp(f);
+  const R=rows().filter(FX.okA).sort((a,b)=>a.produto.localeCompare(b.produto,"pt"));
   const est=R.map(r=>({"Produto":r.produto,"Registro MAPA":r.mapa||"","Código interno":r.codigo||"","Lote":r.lote,"Tipo":r.tipo||"","Conteúdo/unid.":r.conteudo||"","Fabricação":fmtD(r.fabricacao),"Validade":fmtD(r.validade),"Dias p/ vencer":r.dias??"","Situação":ST_LABEL[r.st],"Saldo":r.saldo,"Unidade":r.unidade||"","Localização":r.local||"","Peso em estoque (kg)":r.saldo>0&&!r.descartada?Math.round(kgOf(r)*1000)/1000:0,"IDs em estoque":idsOf(r).ids.map(i=>idLabel(i,idsOf(r).q,idsOf(r).kg,idsOf(r).emb)).join("; "),"Última atualização":fmtD(r.atual),"Responsável":r.respUlt,"Observação":r.obs||""}));
-  const mv=S.movs.slice().sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(m=>({"Data":fmtD(m.data),"Mês":m.data?`${MES[+m.data.slice(5,7)-1]}${m.data.slice(0,4)}`:"","Tipo":MV_LABEL[m.tipo]||m.tipo,"Produto":m.produto,"Lote":m.lote,"Quantidade":m.qtd,"Tipo de saída":(m.tipo==="saida"||m.tipo==="descarte")?catOf(m):"","Motivo":m.motivo||"","Destino":m.cliente||m.destino||"","ID(s)":m.ids||"","Peso (kg)":m.kg||"","Responsável":m.responsavel||"","Observação":m.obs||"","Fotos":m.fotos||0,"Situação":m.status==="pendente"?"Aguardando confirmação":m.status==="recusada"?"Recusada":"Confirmada","Lançado por":m.porNome||m.por||"","Confirmado/recusado por":m.confirmadoNome||m.confirmadoPor||m.recusadoNome||m.recusadoPor||"","Motivo da recusa":m.recusaMotivo||""}));
+  const mv=S.movs.filter(FX.okM).sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(m=>({"Data":fmtD(m.data),"Mês":m.data?`${MES[+m.data.slice(5,7)-1]}${m.data.slice(0,4)}`:"","Tipo":MV_LABEL[m.tipo]||m.tipo,"Produto":m.produto,"Lote":m.lote,"Quantidade":m.qtd,"Tipo de saída":(m.tipo==="saida"||m.tipo==="descarte")?catOf(m):"","Motivo":m.motivo||"","Destino":m.cliente||m.destino||"","ID(s)":m.ids||"","Peso (kg)":m.kg||"","Responsável":m.responsavel||"","Observação":m.obs||"","Fotos":m.fotos||0,"Situação":m.status==="pendente"?"Aguardando confirmação":m.status==="recusada"?"Recusada":"Confirmada","Lançado por":m.porNome||m.por||"","Confirmado/recusado por":m.confirmadoNome||m.confirmadoPor||m.recusadoNome||m.recusadoPor||"","Motivo da recusa":m.recusaMotivo||""}));
   const wb=XLSX.utils.book_new();
   const add=(name,data,cols)=>{ const ws=XLSX.utils.json_to_sheet(data.length?data:[{"":"Sem registros"}]); ws["!cols"]=cols.map(w=>({wch:w})); XLSX.utils.book_append_sheet(wb,ws,name); };
   const cw=[44,20,12,14,20,14,12,12,10,12,8,8,22,14,16,30];
@@ -2268,12 +2307,12 @@ async function exportar(){
   add("Vencidas",est.filter(x=>x["Situação"]==="Vencida"),cw);
   const cn=id=>{ const c=S.clientes.find(x=>x.id===id); return c?c:{}; };
   if(S.clientes.length) add("Clientes e laboratórios",S.clientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt")).map(c=>({"Nome":c.nome,"Tipo":c.tipo||"Cliente","País":c.pais||"","Cidade":c.cidade||"","Contato":c.contato||"","E-mail / telefone":c.email||"","Observação":c.obs||""})),[28,18,14,18,20,26,30]);
-  const ev=enviosAll(); if(ev.length) add("Envios clientes-lab",ev.slice().sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(e=>({"Data":fmtD(e.data),"Cliente / laboratório":cn(e.clienteId).nome||e.cliente||"","Tipo":cn(e.clienteId).tipo||"","País":cn(e.clienteId).pais||"","Produto":e.produto,"Lote":e.lote,"ID(s)":e.ids||"","Quantidade":e.qtd,"Peso (kg)":e.kg||"","Responsável":e.responsavel||"","Observação":e.obs||"","Origem":e.origem==="planilha"?"Planilha":"App"})),[12,26,14,50,12,10,16,30,10]);
-  if(S.hist.length) add("Histórico mensal",S.hist.slice().sort((a,b)=>String(a.mes).localeCompare(b.mes)||String(a.produto).localeCompare(b.produto,"pt")).map(h=>({"Mês":h.mes,"Produto":h.produto,"Unidades retiradas":h.qtd,"Lotes":h.lotes||""})),[10,56,18,8]);
+  const ev=enviosAll().filter(FX.okL); if(ev.length) add("Envios clientes-lab",ev.slice().sort((a,b)=>String(a.data).localeCompare(String(b.data))).map(e=>({"Data":fmtD(e.data),"Cliente / laboratório":cn(e.clienteId).nome||e.cliente||"","Tipo":cn(e.clienteId).tipo||"","País":cn(e.clienteId).pais||"","Produto":e.produto,"Lote":e.lote,"ID(s)":e.ids||"","Quantidade":e.qtd,"Peso (kg)":e.kg||"","Responsável":e.responsavel||"","Observação":e.obs||"","Origem":e.origem==="planilha"?"Planilha":"App"})),[12,26,14,50,12,10,16,30,10]);
+  if(S.hist.length&&!FX.set) add("Histórico mensal",S.hist.filter(h=>FX.okL({produto:h.produto})).sort((a,b)=>String(a.mes).localeCompare(b.mes)||String(a.produto).localeCompare(b.produto,"pt")).map(h=>({"Mês":h.mes,"Produto":h.produto,"Unidades retiradas":h.qtd,"Lotes":h.lotes||""})),[10,56,18,8]);
   add("Produtos",PRODS().map(p=>({"Produto":p.nome,"Registro MAPA":p.mapa||"","Categoria":p.categoria||""})),[56,22,14]);
   add("Movimentações",mv,[12,10,10,30,14,10,18,24,12,16,10,16,30,8,22,24,24,30]);
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-  const fname=`Amostras_Produto_Acabado_${hoje().split("-").reverse().join(".")}.xlsx`;
+  const fname=`Amostras_Produto_Acabado_${FX.lotes.length===1?"Lote_"+FX.lotes[0].replace(/[^\w.-]+/g,"-")+"_":FX.ativo?"filtrado_":""}${hoje().split("-").reverse().join(".")}.xlsx`;
   const dlc=DL;
   try{ await dlc.save({filename:fname,data:new Uint8Array(out)}); toast("Planilha exportada"); }
   catch(e){ if(e&&e.code!=="declined") toast("Não foi possível exportar agora."); }
