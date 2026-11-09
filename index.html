@@ -190,8 +190,8 @@ input,select,textarea{font:14px var(--body);color:var(--ink);background:var(--su
 textarea{padding:9px 11px}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
 textarea{resize:vertical;min-height:60px}
-.toolbar .field{flex:1 1 150px}
-.toolbar .field.grow{flex:3 1 220px}
+.toolbar .field{flex:1 1 128px;min-width:0}
+.toolbar .field.grow{flex:3 1 190px}
 .tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;font-weight:600;background:var(--sunk);padding:8px 10px;white-space:nowrap;position:sticky;top:0}
@@ -635,7 +635,7 @@ const DEFAULT_CFG = {
 };
 const S = { role:"total", isOwner:false, myId:null, canW:null, acessos:{}, pessoas:[], amostras:[], movs:[], hist:[], clientes:[], envh:[], envIds:{}, stkIds:{}, stkKg:{}, envKg:{}, fc:{q:"",pais:"",tipo:""}, cfg:{...DEFAULT_CFG}, mode:"loading", tab:"painel", readonly:false,
   f:{ q:"", status:"ativas", local:"", tipo:"", sort:"validade" },
-  fm:{ q:"", tipo:"", resp:"", de:"", ate:"", sit:"" },
+  fm:{ q:"", tipo:"", resp:"", de:"", ate:"", sit:"", dest:"" },
   fe:{ cat:"", q:"", foto:"", de:"", ate:"" } };
 let db=null, me=null, pendingRefresh=false;
 const FULL=()=>S.role==="total";
@@ -1339,14 +1339,18 @@ function shellMovs(){
     <div class="field dsk"><label for="mtp">Tipo</label><select id="mtp"><option value="">Todos</option>${Object.entries(MV_LABEL).map(([v,l])=>`<option value="${v}"${f.tipo===v?" selected":""}>${l}</option>`).join("")}</select></div>
     <div class="field"><label for="msit">Situação</label><select id="msit">${[["","Todas"],["pendente","Aguardando confirmação"],["confirmada","Confirmadas"],["recusada","Recusadas"]].map(([v,l])=>`<option value="${v}"${f.sit===v?" selected":""}>${l}</option>`).join("")}</select></div>
     <div class="field"><label for="mrs">Responsável</label><select id="mrs">${opts(resps,f.resp,"Todos")}</select></div>
+    <div class="field"><label for="mdst">Destino</label><select id="mdst">${(()=>{ const cli=[...new Set([...S.clientes.map(c=>c.nome),...S.movs.map(m=>m.cliente).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,"pt"));
+      const dst=[...new Set([...S.cfg.destinos,...S.movs.map(m=>m.cliente?"":(m.destino&&m.destino!=="—"&&m.tipo!=="reclass_out"?m.destino:"")).filter(Boolean)])].filter(x=>!cli.includes(x)).sort((a,b)=>a.localeCompare(b,"pt"));
+      const o=v=>`<option value="${esc(v)}"${f.dest===v?" selected":""}>${esc(v)}</option>`;
+      return `<option value="">Todos</option><option value="__sem"${f.dest==="__sem"?" selected":""}>Sem destino informado</option>${dst.length?`<optgroup label="Destinos">${dst.map(o).join("")}</optgroup>`:""}${cli.length?`<optgroup label="Clientes e laboratórios">${cli.map(o).join("")}</optgroup>`:""}`; })()}</select></div>
     <div class="field"><label for="mde">De</label><input id="mde" type="date" value="${esc(f.de)}"></div>
     <div class="field"><label for="mat">Até</label><input id="mat" type="date" value="${esc(f.ate)}"></div>
   </div><div id="data"></div>`;
 }
 function filtraMovs(){
   const f=S.fm,q=norm(f.q);
-  return S.movs.filter(m=>(!f.sit||(m.status||"confirmada")===f.sit)&&(!f.tipo||m.tipo===f.tipo)&&(!f.resp||m.responsavel===f.resp)&&(!f.de||m.data>=f.de)&&(!f.ate||m.data<=f.ate)
-    &&(!q||norm([m.produto,m.lote,m.motivo,m.obs,m.destino].join(" ")).includes(q)))
+  return S.movs.filter(m=>(!f.sit||(m.status||"confirmada")===f.sit)&&(!f.tipo||m.tipo===f.tipo)&&(!f.resp||m.responsavel===f.resp)&&(!f.dest||(f.dest==="__sem"?!destOf(m)&&(m.tipo==="saida"||m.tipo==="descarte"):destOf(m)===f.dest))&&(!f.de||m.data>=f.de)&&(!f.ate||m.data<=f.ate)
+    &&(!q||norm([m.produto,m.lote,m.ids,m.motivo,m.obs,m.destino,m.cliente].join(" ")).includes(q)))
     .sort((a,b)=>String(b.data).localeCompare(String(a.data))||String(b.criadoEm).localeCompare(String(a.criadoEm)));
 }
 function dataMovs(){
@@ -1568,7 +1572,7 @@ function bindShell(){
   on("fq","q",S.f); on("fst","status",S.f,"change"); on("floc","local",S.f,"change"); on("ftp","tipo",S.f,"change"); on("fso","sort",S.f,"change");
   on("cq","q",S.fc); on("cpa","pais",S.fc,"change"); on("ctp","tipo",S.fc,"change");
   on("eq","q",S.fe); on("ecat","cat",S.fe,"change"); on("efo","foto",S.fe,"change"); on("ede","de",S.fe,"change"); on("eat","ate",S.fe,"change");
-  on("msit","sit",S.fm,"change"); on("mq","q",S.fm); on("mtp","tipo",S.fm,"change"); on("mrs","resp",S.fm,"change"); on("mde","de",S.fm,"change"); on("mat","ate",S.fm,"change");
+  on("msit","sit",S.fm,"change"); on("mq","q",S.fm); on("mtp","tipo",S.fm,"change"); on("mrs","resp",S.fm,"change"); on("mdst","dest",S.fm,"change"); on("mde","de",S.fm,"change"); on("mat","ate",S.fm,"change");
 }
 $("#main").addEventListener("click", async e=>{
   if(e.target.id==="accLoad"){ e.target.disabled=true; e.target.textContent="Carregando…"; await loadAccLog(); return; }
