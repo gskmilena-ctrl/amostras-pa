@@ -78,6 +78,24 @@
   --shadow:0 14px 34px rgba(60,40,10,.15); color-scheme:light;
 }
 :root[data-skin="maracuja"] .btn.primary{background:linear-gradient(135deg,#ffb347 0%,#f29111 50%,#d97a00 100%);border-color:#d97a00}
+:root[data-skin="rosa"]{
+  --bg:#fdf3f6; --surface:#ffffff; --sunk:#fbebf1; --surface3:#f4d7e2; --ink:#2e1520; --muted:#7a5464; --dim:#a58593; --line:#f0d8e2; --line2:#e4bfce;
+  --accent:#d6457a; --accent-ink:#ffffff; --accent-soft:rgba(214,69,122,.12);
+  --ok:#3f8a4a; --ok-soft:rgba(63,138,74,.13); --warn:#a66a00; --warn-soft:rgba(166,106,0,.13); --bad:#b5463c; --bad-soft:rgba(181,70,60,.12); --idle:#7a5464; --idle-soft:#f4d7e2;
+  --shadow:0 14px 34px rgba(90,20,50,.14); color-scheme:light;
+}
+:root[data-skin="rosa"] body{background:radial-gradient(44% 34% at 100% 0%,rgba(240,130,170,.20),transparent 70%),radial-gradient(40% 34% at 0% 100%,rgba(255,190,210,.30),transparent 72%),var(--bg);background-attachment:fixed}
+:root[data-skin="rosa"] .btn.primary,:root[data-skin="rosa"] .ptab[aria-pressed="true"]{background:linear-gradient(135deg,#f590b5 0%,#e05a8f 50%,#c2366b 100%);border-color:#c2366b;color:#fff}
+:root[data-skin="rosa"] .rn[aria-selected="true"]::before{background:linear-gradient(180deg,#f590b5,#c2366b)}
+:root[data-skin="laranja"]{
+  --bg:#140c06; --surface:#1d1209; --sunk:#26180c; --surface3:#332110; --ink:#fbefe3; --muted:#d0ab88; --dim:#94735a; --line:#3a2614; --line2:#4f341c;
+  --accent:#ff8a1f; --accent-ink:#2a1300; --accent-soft:rgba(255,138,31,.16);
+  --ok:#7fc79a; --ok-soft:rgba(127,199,154,.15); --warn:#ffc35b; --warn-soft:rgba(255,195,91,.15); --bad:#ff8f80; --bad-soft:rgba(255,143,128,.15); --idle:#d0ab88; --idle-soft:#332110;
+  --shadow:0 16px 40px rgba(0,0,0,.6); color-scheme:dark;
+}
+:root[data-skin="laranja"] body{background:radial-gradient(46% 36% at 94% -4%,rgba(255,138,31,.20),transparent 70%),radial-gradient(42% 36% at -6% 104%,rgba(255,190,90,.10),transparent 72%),var(--bg);background-attachment:fixed}
+:root[data-skin="laranja"] .btn.primary,:root[data-skin="laranja"] .ptab[aria-pressed="true"]{background:linear-gradient(135deg,#ffb35c 0%,#ff8a1f 50%,#e8620c 100%);border-color:#e8620c;color:#2a1300}
+:root[data-skin="laranja"] #tbTitle{background:linear-gradient(90deg,#ffd29c,#ff8a1f 60%,#e8620c);-webkit-background-clip:text;background-clip:text;color:transparent}
 :root[data-skin="grafite"]{
   --bg:#111214; --surface:#18191c; --sunk:#1f2124; --surface3:#292b2f; --ink:#ececec; --muted:#a3a6ab; --dim:#707378; --line:#2b2d31; --line2:#3a3d42;
   --accent:#e6e6e6; --accent-ink:#111214; --accent-soft:rgba(230,230,230,.11);
@@ -569,7 +587,7 @@ td>.rowacts{min-width:172px}
     <div class="rail-user">
       <div><span class="acc-chip" id="accChip" hidden></span></div>
       <button type="button" class="btn" id="btnSair" hidden>Sair</button>
-      <div class="field"><label for="skinSel">Tema</label><select id="skinSel"><option value="ouro">Dourado</option><option value="meripobo">Meri Pobo</option><option value="meripobo-claro">Meri Pobo claro</option><option value="acerola">Acerola</option><option value="maracuja">Maracujá (claro)</option><option value="roxo">Roxo escuro</option><option value="claro">Claro</option><option value="oceano">Oceano</option><option value="floresta">Floresta</option><option value="grafite">Grafite</option></select></div>
+      <div class="field"><label for="skinSel">Tema</label><select id="skinSel"><option value="ouro">Dourado</option><option value="meripobo">Meri Pobo</option><option value="meripobo-claro">Meri Pobo claro</option><option value="acerola">Acerola</option><option value="maracuja">Maracujá (claro)</option><option value="rosa">Rosa (claro)</option><option value="laranja">Laranja</option><option value="roxo">Roxo escuro</option><option value="claro">Claro</option><option value="oceano">Oceano</option><option value="floresta">Floresta</option><option value="grafite">Grafite</option></select></div>
     </div>
   </aside>
   <div class="content">
@@ -872,7 +890,7 @@ async function init(){
 function setTab(t){ S.tab=t; LS.set("tab",t); render(); }
 ["tabs","bnav"].forEach(n=>document.getElementById(n).addEventListener("click",e=>{ const b=e.target.closest("button[data-tab]"); if(b){ setTab(b.dataset.tab); window.scrollTo(0,0); } }));
 const TAB_LABEL={painel:"Painel",estoque:"Estoque",movs:"Movimentações",evidencias:"Evidências",vencidas:"Vencidas",clientes:"Clientes / Lab. externo",cadastros:"Cadastros"};
-const SKIN_INFO={ouro:["Dourado","#0b0d16","#d9b46a"],meripobo:["Meri Pobo","#0f1e36","#f5c518","#4caf50"],"meripobo-claro":["Meri Pobo claro","#ffffff","#1d5a96","#f5c518"],acerola:["Acerola","#1e0f13","#ff5a6e"],maracuja:["Maracujá (claro)","#fbf7ee","#d97a00"],roxo:["Roxo escuro","#13131c","#a78bfa"],claro:["Claro","#f5f5f7","#7c3aed"],oceano:["Oceano","#151b23","#6b9bd1"],floresta:["Floresta","#171b18","#7fb59a"],grafite:["Grafite","#18191c","#e6e6e6"]};
+const SKIN_INFO={ouro:["Dourado","#0b0d16","#d9b46a"],meripobo:["Meri Pobo","#0f1e36","#f5c518","#4caf50"],"meripobo-claro":["Meri Pobo claro","#ffffff","#1d5a96","#f5c518"],acerola:["Acerola","#1e0f13","#ff5a6e"],maracuja:["Maracujá (claro)","#fbf7ee","#d97a00"],rosa:["Rosa (claro)","#fdf3f6","#d6457a","#f590b5"],laranja:["Laranja","#1d1209","#ff8a1f","#ffc35b"],roxo:["Roxo escuro","#13131c","#a78bfa"],claro:["Claro","#f5f5f7","#7c3aed"],oceano:["Oceano","#151b23","#6b9bd1"],floresta:["Floresta","#171b18","#7fb59a"],grafite:["Grafite","#18191c","#e6e6e6"]};
 const SKINS=Object.keys(SKIN_INFO);
 function applySkin(k){ if(!SKINS.includes(k)) k="ouro"; if(k==="roxo") delete document.documentElement.dataset.skin; else document.documentElement.dataset.skin=k; const mt=document.querySelector('meta[name="theme-color"]'); if(mt) mt.content=getComputedStyle(document.documentElement).getPropertyValue("--surface").trim()||"#121524"; const sel=document.getElementById("skinSel"); if(sel) sel.value=k; LS.set("skin",k); }
 applySkin(LS.get("skin","ouro"));
