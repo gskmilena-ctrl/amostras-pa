@@ -237,7 +237,7 @@ td>.rowacts{min-width:172px}
 .obsc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:520px}
 .thu{font-size:10.5px;font-weight:600;color:var(--dim);text-transform:none;letter-spacing:0}
 .na-rows input{min-height:40px}
-.na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}.na-rows .na_emb{width:160px;min-height:40px}
+.na-rows .na_id{width:120px}.na-rows .na_n{width:76px}.na-rows .na_kg{width:110px}.na-rows .na_emb{width:160px;min-height:40px}.na-rows .na_kg.auto{background:var(--sunk);color:var(--muted);border-style:dashed;cursor:default}
 .frbal{background:var(--sunk);border-radius:10px;padding:10px 14px;font-size:13.5px;display:flex;gap:6px 18px;flex-wrap:wrap}.frbal b{font-family:var(--mono)}
 .fropen{border:1px solid var(--warn);border-radius:10px;padding:10px 12px;display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;background:color-mix(in srgb,var(--warn) 8%,transparent)}
 @media (max-width:600px){.na-rows td,.na-rows th{padding:6px 4px}.na-rows .na_id{width:84px}.na-rows .na_n{width:54px}.na-rows .na_kg{width:86px}.na-rows .na_emb{width:108px;padding-left:6px;padding-right:2px;font-size:13px}.na-rows input{padding-left:8px;padding-right:8px}.na-rows .na_rm{padding:0 8px;min-height:40px}}
@@ -759,28 +759,32 @@ const patchIds=(st,conf,data)=>({ids:st.ids,idsQ:st.q,idsKg:st.kg,idsEmb:st.emb,
 /* fracionamentos (saco aberto no laboratório) cujos frascos ainda não voltaram */
 function fracAbertos(aid){ return S.movs.filter(m=>(!aid||m.amostraId===aid)&&m.fracId&&m.tipo!=="entrada"&&m.status!=="recusada"&&!m.fracFechado&&!S.movs.some(e=>e.tipo==="entrada"&&e.fracId===m.fracId&&e.status!=="recusada")).sort((a,b)=>String(b.data).localeCompare(String(a.data))); }
 const rowsHead=()=>`<thead><tr><th>ID</th><th>Embalagem</th><th class="num">Volumes<br><span class="thu">un</span></th><th class="num">Peso total<br><span class="thu">kg</span></th><th></th></tr></thead>`;
-const rowsBox=(pfx,add)=>`<div class="tablebox"><table class="na-rows">${rowsHead()}<tbody id="${pfx}_rows"></tbody></table></div><div class="na-tot"><button type="button" class="btn sm" id="${pfx}_add">${add}</button><div class="sub" id="${pfx}_sum"></div></div>`;
+const rowsBox=(pfx,add)=>`<div class="tablebox"><table class="na-rows">${rowsHead()}<tbody id="${pfx}_rows"></tbody></table></div><div class="sub" style="margin-top:4px">Frascos e outras embalagens com o peso no nome: digite só os volumes, o peso total é calculado. Saco valvulado: digite o peso.</div><div class="na-tot"><button type="button" class="btn sm" id="${pfx}_add">${add}</button><div class="sub" id="${pfx}_sum"></div></div>`;
 /* editor de linhas ID · embalagem · volumes · peso (cadastro, entrada e fracionamento) */
+/* peso de uma embalagem pelo nome (ex.: "Frasco 0,250 kg" → 0,25; "Frasco 350 g" → 0,35). Saco valvulado não tem: peso digitado. */
+const embKg=e=>{ const m=String(e||"").match(/(\d+(?:[.,]\d+)?)\s*(kg|g)\b/i); if(!m) return 0; const v=parseFloat(m[1].replace(",",".")); return m[2].toLowerCase()==="g"?v/1000:v; };
 function rowEditor(root,pfx,o){
   o=o||{}; const L=[{id:o.id0||"",emb:o.emb0||"",n:1,kg:""}]; let ready=false;
   const tb=root.querySelector(`#${pfx}_rows`), sum=root.querySelector(`#${pfx}_sum`), add=root.querySelector(`#${pfx}_add`);
   const blank=()=>({id:"",emb:(L.length?L[L.length-1].emb:o.emb0)||"",n:1,kg:""});
   const tot=()=>{ const ok=L.filter(x=>x.id); return {n:ok.reduce((s,x)=>s+(Number(x.n)||0),0),kg:r3(ok.reduce((s,x)=>s+(parseKg(String(x.kg))||0),0))}; };
   const showSum=()=>{ const t=tot(); if(sum) sum.innerHTML=`${o.sumLabel||"Quantidade"}: <b>${t.n}</b> ${esc((o.un&&o.un())||"un")} · peso total <b>${fkg(t.kg)}</b> kg`; if(o.onChange&&ready) o.onChange(t); };
-  const draw=fk=>{ tb.innerHTML=L.map((x,k)=>`<tr><td><input class="na_id" data-k="${k}" value="${esc(x.id)}" placeholder="ex.: A41" aria-label="ID da amostra ${k+1}" style="font-family:var(--mono);text-transform:uppercase"></td>
+  const auto=x=>embKg(x.emb)>0;
+  const fix=x=>{ if(auto(x)) x.kg=(Number(x.n)>0?r3(embKg(x.emb)*Number(x.n)).toFixed(3):"").replace(".",","); return x; };
+  const draw=(fk,fsel)=>{ L.forEach(fix); tb.innerHTML=L.map((x,k)=>`<tr><td><input class="na_id" data-k="${k}" value="${esc(x.id)}" placeholder="ex.: A41" aria-label="ID da amostra ${k+1}" style="font-family:var(--mono);text-transform:uppercase"></td>
       <td><select class="na_emb" data-k="${k}" aria-label="Embalagem da amostra ${k+1}">${embOpts(x.emb)}</select></td>
       <td class="num"><input class="na_n" data-k="${k}" type="number" min="1" step="1" value="${x.n}" aria-label="Volumes da amostra ${k+1}" style="text-align:right"></td>
-      <td class="num"><input class="na_kg" data-k="${k}" inputmode="decimal" value="${esc(x.kg==null?"":String(x.kg))}" placeholder="0,000" aria-label="Peso total da amostra ${k+1} em kg" style="text-align:right;font-family:var(--mono)"></td>
+      <td class="num"><input class="na_kg${auto(x)?" auto":""}" data-k="${k}" inputmode="decimal" value="${esc(x.kg==null?"":String(x.kg))}" placeholder="${auto(x)?"automático":"digite"}"${auto(x)?` readonly tabindex="-1" title="Calculado: ${x.n||0} × ${fkg(embKg(x.emb))} kg (${esc(x.emb)})"`:""} aria-label="Peso total da amostra ${k+1} em kg${auto(x)?", calculado":""}" style="text-align:right;font-family:var(--mono)"></td>
       <td><button type="button" class="btn sm na_rm" data-k="${k}" aria-label="Remover linha ${k+1}"${L.length===1?" disabled":""}>×</button></td></tr>`).join("");
-    showSum(); if(fk!=null){ const f=tb.querySelector(`.na_id[data-k="${fk}"]`); if(f) f.focus(); } };
+    showSum(); if(fk!=null){ const f=tb.querySelector(`${fsel||".na_id"}[data-k="${fk}"]`); if(f) f.focus(); } };
   const embDe=t=>{ const n=norm(t); return EMB().find(x=>norm(x)===n)||t; };
   add.onclick=()=>{ L.push(blank()); draw(L.length-1); };
   tb.addEventListener("input",ev=>{ const t=ev.target, k=+t.dataset.k; if(!L[k]) return;
-    if(t.classList.contains("na_id")) L[k].id=t.value.trim().toUpperCase(); else if(t.classList.contains("na_n")) L[k].n=parseInt(t.value)||0; else if(t.classList.contains("na_kg")) L[k].kg=t.value; showSum(); });
-  tb.addEventListener("change",ev=>{ const t=ev.target, k=+t.dataset.k; if(t.classList.contains("na_emb")&&L[k]){ L[k].emb=t.value; showSum(); } });
+    if(t.classList.contains("na_id")) L[k].id=t.value.trim().toUpperCase(); else if(t.classList.contains("na_n")){ L[k].n=parseInt(t.value)||0; if(auto(L[k])){ fix(L[k]); const kc=tb.querySelector(`.na_kg[data-k="${k}"]`); if(kc){ kc.value=L[k].kg; kc.title=`Calculado: ${L[k].n||0} × ${fkg(embKg(L[k].emb))} kg (${L[k].emb})`; } } } else if(t.classList.contains("na_kg")) L[k].kg=t.value; showSum(); });
+  tb.addEventListener("change",ev=>{ const t=ev.target, k=+t.dataset.k; if(t.classList.contains("na_emb")&&L[k]){ const era=auto(L[k]); L[k].emb=t.value; if(era&&!auto(L[k])) L[k].kg=""; draw(k,auto(L[k])?".na_n":".na_kg"); } });
   tb.addEventListener("click",ev=>{ const b=ev.target.closest(".na_rm"); if(!b) return; ev.preventDefault(); L.splice(+b.dataset.k,1); if(!L.length) L.push(blank()); draw(); });
   tb.addEventListener("keydown",ev=>{ if(ev.key!=="Enter") return; const t=ev.target; if(!t.matches(".na_id,.na_n,.na_kg,.na_emb")) return; ev.preventDefault();
-    const k=+t.dataset.k; if(t.classList.contains("na_id")||t.classList.contains("na_emb")){ const nx=tb.querySelector(`.na_kg[data-k="${k}"]`); nx&&nx.focus(); return; }
+    const k=+t.dataset.k; if(t.classList.contains("na_id")||t.classList.contains("na_emb")){ const nx=tb.querySelector(`${L[k]&&auto(L[k])?".na_n":".na_kg"}[data-k="${k}"]`); nx&&nx.focus(); return; }
     if(k===L.length-1){ L.push(blank()); draw(L.length-1); } else { const f=tb.querySelector(`.na_id[data-k="${k+1}"]`); f&&f.focus(); } });
   tb.addEventListener("paste",ev=>{ const t=ev.target; if(!t.classList.contains("na_id")) return; const txt=(ev.clipboardData||window.clipboardData).getData("text"); if(!/[\t\n;]/.test(txt.trim())) return;
     ev.preventDefault(); const k=+t.dataset.k; let prev=L[k].emb||o.emb0||"";
