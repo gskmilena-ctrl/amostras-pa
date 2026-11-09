@@ -1561,6 +1561,13 @@ function dataCadastros(){
     <div class="tablebox"><table><thead><tr><th>Produto</th><th>Registro MAPA</th><th>Código interno</th><th>Categoria</th><th>Par para reclassificação</th><th></th></tr></thead><tbody>
     ${PRODS().map((p,i)=>`<tr class="row"><td class="prod">${esc(p.nome)}</td><td class="mono">${esc(p.mapa||"—")}</td><td>${ro?`<span class="mono">${esc(p.codigo||"—")}</span>`:`<input class="codinp" data-i="${i}" value="${esc(p.codigo||"")}" inputmode="numeric" placeholder="—" aria-label="Código interno de ${esc(p.nome)}" style="width:96px;min-height:36px;font-family:var(--mono)">`}</td><td>${esc(p.categoria||"")}</td><td>${p.categoria==="Orgânico"&&!ro?`<select class="parsel" data-i="${i}" aria-label="Par convencional de ${esc(p.nome)}" style="max-width:280px"><option value="">—</option>${PRODS().filter(x=>x.categoria==="Convencional").map(x=>`<option${x.nome===p.par?" selected":""}>${esc(x.nome)}</option>`).join("")}</select>`:`<span class="sub">${esc(p.par||"")}</span>`}</td><td><div class="rowacts">${ro?"":`<button class="btn sm" data-act="rmprod" data-i="${i}" aria-label="Remover ${esc(p.nome)}">Remover</button>`}</div></td></tr>`).join("")||`<tr><td colspan="6" class="muted">Nenhum produto cadastrado.</td></tr>`}
     </tbody></table></div></div>
+  ${(()=>{ const C=S.clientes.slice().sort((a,b)=>(a.tipo||"").localeCompare(b.tipo||"","pt")||a.nome.localeCompare(b.nome,"pt")); const st=statsClientes();
+    return `<div class="panel"><h2>Clientes e laboratórios externos <small>${C.length} cadastrado${C.length===1?"":"s"}</small></h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between"><p class="sub" style="margin:0;flex:1;min-width:240px">Aparecem na retirada quando o tipo de saída é Cliente ou Laboratório externo, e no filtro de Destino das movimentações.</p>${ro?"":`<button type="button" class="btn primary" data-act="novocli">+ Novo cliente / laboratório</button>`}</div>
+    ${C.length?`<div class="tablebox"><table><thead><tr><th>Nome</th><th>Tipo</th><th>País</th><th>Cidade / estado</th><th>Contato</th><th class="num">Envios</th><th></th></tr></thead><tbody>
+    ${C.map(c=>`<tr class="row"><td class="prod">${esc(c.nome)}</td><td>${esc(c.tipo||"Cliente")}</td><td>${esc(c.pais||"—")}</td><td>${esc(c.cidade||"—")}</td><td>${esc(c.contato||"")}${c.email?`<div class="sub">${esc(c.email)}</div>`:""}</td><td class="num">${nf((st[c.id]||{n:0}).n)}</td>
+      <td><div class="rowacts">${ro?"":`<button type="button" class="btn sm" data-act="cliedit" data-id="${c.id}">Editar</button>`}<button type="button" class="btn sm" data-act="cli" data-id="${c.id}">Detalhes</button></div></td></tr>`).join("")}
+    </tbody></table></div>`:`<p class="sub" style="margin:0">Nenhum cliente ou laboratório cadastrado ainda.</p>`}</div>`; })()}
   <div class="lists">${LISTS.map(([k,t,d])=>`<div class="panel"><h2>${t} <small>${(S.cfg[k]||[]).length}</small></h2>${d?`<p class="sub" style="margin:0">${d}</p>`:""}
     <div class="chips">${(S.cfg[k]||[]).map((v,i)=>`<span class="chip">${esc(v)}${ro?"":`<button data-act="rmlist" data-k="${k}" data-i="${i}" aria-label="Remover ${esc(v)}">×</button>`}</span>`).join("")||`<span class="sub">Lista vazia.</span>`}</div>
     ${ro?"":`<form class="addrow" data-k="${k}"><input id="add-${k}" placeholder="${k==="embalagens"?"ex.: Frasco 0,500 kg":"Adicionar…"}" aria-label="Adicionar em ${t}"><button class="btn sm" type="submit">Adicionar</button></form>`}</div>`).join("")}</div>`;
@@ -1607,6 +1614,7 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="hist") historico(id);
   else if(act==="ajustar") ajustarLote(id);
   else if(act==="novocli") formCliente();
+  else if(act==="cliedit"){ const c=S.clientes.find(x=>x.id===id); if(c) formCliente(c); }
   else if(act==="cli") clienteDetalhe(id);
   else if(act==="enviarcli") formMov(null,"saida",id);
   else if(act==="delmov"){ const m=S.movs.find(x=>x.id===id); if(!m) return; const ini=m.tipo==="entrada"&&m.motivo==="Cadastro inicial";
