@@ -1789,7 +1789,7 @@ function formMov(id, tipo, clienteId, opt){
     <div class="full lotsug" id="m_lotsug" hidden></div>
     <input type="hidden" id="m_am" value="${r?r.id:""}"><div class="ref full" id="m_ref"></div>`;
   const out=tipo!=="entrada";
-  const catIni=clienteId?(isLab(clienteId)?"Laboratório externo":"Cliente"):"";
+  const catIni=opt.cat||(clienteId?(isLab(clienteId)?"Laboratório externo":"Cliente"):"");
   const body=`${sel}
     ${tipo==="saida"?`<div class="field full"><label for="m_cat">Tipo de saída *</label><select id="m_cat"><option value="">Selecione</option>${CATS_SAIDA.map(c=>`<option${c===catIni?" selected":""}>${c}</option>`).join("")}</select></div>`:""}
     <div class="field"><label for="m_qtd">Quantidade *</label><input id="m_qtd" type="number" min="0" step="any" inputmode="decimal" required></div>
@@ -1892,9 +1892,12 @@ function formMov(id, tipo, clienteId, opt){
       :`<div class="sub" style="padding:10px 12px">Nenhum lote ${tipo==="entrada"?"":"com saldo "}com esse número.</div>`; };
   if(!id){ const li=q("#m_lotq"); li.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); const f=q("#m_lotsug .lsug"); if(f) escolherLote(f.dataset.id); } }); setTimeout(()=>li.focus(),60); }
   upd();
-  if(opt.preId&&r&&out){ const io0=idsOf(r); if(io0.ids.includes(opt.preId)&&avail(io0,opt.preId)>0&&tipo!=="descarte"){ selQ={[opt.preId]:1}; paint(); } }
+  if(opt.preId&&r&&out){ const io0=idsOf(r); if(io0.ids.includes(opt.preId)&&avail(io0,opt.preId)>0){ selQ={[opt.preId]:1}; paint(); }
+    if(opt.lock){ const ch=q("#m_idchips"); if(ch) ch.hidden=true; const ti=q("#m_ids"); if(ti){ ti.readOnly=true; ti.tabIndex=-1; }
+      const sb=q("#m_selbox"); if(sb) sb.insertAdjacentHTML("beforebegin",`<div class="sub" style="margin:0 0 6px;color:var(--ink)">🔒 ID lido pelo QR code: <b style="font-family:var(--mono)">${esc(baseId(opt.preId,io0.emb[opt.preId]))}</b>${io0.emb[opt.preId]?` · ${esc(io0.emb[opt.preId])}`:""}. Para incluir outros IDs, leia o QR code de cada um.</div>`); } }
   m.form.onsubmit=async e=>{
     e.preventDefault(); const err=q("#m_err"); if(!r){ err.textContent="Digite o lote e escolha a amostra."; q("#m_lotq").focus(); return; }
+    if(opt.lock&&out){ const ks=Object.keys(selQ); if(ks.length!==1||ks[0]!==opt.preId){ err.textContent=`Este lançamento é só do ID lido pelo QR code (${baseId(opt.preId,idsOf(r).emb[opt.preId])}). Leia o QR code de novo se precisar.`; return; } }
     let RW=null; if(!out){ const v=RE.validate(); if(v.err){ err.textContent=v.err; return; } if(!v.rows.length){ err.textContent="Inclua pelo menos uma linha com o ID da amostra que entra."; return; } RW=v.rows; q("#m_qtd").value=RW.reduce((s,x)=>s+x.n,0); }
     const qtd=Number(q("#m_qtd").value.replace(",",".")); const resp=q("#m_resp").value; const data=q("#m_data").value;
     if(!(qtd>0)){ err.textContent="Informe uma quantidade maior que zero."; return; }
@@ -2343,12 +2346,22 @@ function qrAbrir(aid,key){
   const body=`<div class="ref full"><div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span> · ${esc(r.local||"sem local")}</div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"un")} no lote</span></div></div>
     <div class="full" style="font-size:15px">${tem?`<b style="font-family:var(--mono);font-size:22px">${esc(baseId(key,e))}</b>${e?` · ${esc(e)}`:""}${un>1?` · ${un} volumes`:""}${io.kg[key]?` · ${fkg(io.kg[key])} kg`:""}`:`<span style="color:var(--warn)">O ID <b>${esc(baseId(key,e)||key)}</b> não está mais em estoque neste lote (já saiu ou foi reclassificado).</span>`}</div>
     <div class="full sub">Validade ${fmtD(r.validade)} · fabricação ${fmtD(r.fabricacao)}</div>`;
-  const ok=tem&&!ro&&!r.descartada;
-  const m=modal("Amostra lida pelo QR code",body,`<button type="button" class="btn" id="qr_det" style="margin-right:auto">Detalhes</button>${ok&&r.disp>0&&r.st!=="vencida"?`<button type="button" class="btn" id="qr_fr">Fracionar</button>`:""}${ok&&r.saldo>0?`<button type="button" class="btn primary" id="qr_rt">Retirar este ID</button>`:""}`);
+  const resv=tem&&((reservas(r.id)[key]||0)>=un);
+  const ok=tem&&!resv&&!ro&&!r.descartada&&r.saldo>0; const venc=r.st==="vencida";
+  const opc=ok?[...CATS_SAIDA.map(c=>[c,CAT_LABEL[c],CAT_COLOR[c]]),["Descarte",CAT_LABEL["Descarte"],CAT_COLOR["Descarte"]]]:[];
+  const grade=ok?`<div class="full"><div class="sub" style="margin-bottom:8px">O que vai ser feito com esta amostra?</div>${venc?`<div class="sub" style="color:var(--bad);margin-bottom:8px">Amostra vencida: o normal é o descarte.</div>`:""}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">${opc.map(([c,l,cor])=>`<button type="button" class="btn qrop" data-c="${esc(c)}" style="justify-content:flex-start;text-align:left;border-left:5px solid ${cor};min-height:48px${venc&&c==="Descarte"?";font-weight:800":""}">${esc(l)}</button>`).join("")}
+    ${r.disp>0&&!venc?`<button type="button" class="btn qrop" data-c="__frac" style="justify-content:flex-start;text-align:left;border-left:5px solid #8a6a00;min-height:48px">🧪 Fracionar (abrir para o laboratório)</button>`:""}</div>
+    <div class="sub" style="margin-top:8px">O lançamento já vem com o lote e o ID ${esc(baseId(key,e))}. ${precisaConfirmar("saida")?"Ele segue para a confirmação de quem tem acesso total.":""}</div></div>`:"";
+  const aviso=resv?`<div class="full fropen">⏳ Este ID já está numa retirada <b>aguardando confirmação</b>. Espere a confirmação ou peça a quem tem acesso total para conferir no Painel.</div>`:"";
+  const m=modal("Amostra lida pelo QR code",body+aviso+grade,`<button type="button" class="btn" id="qr_det">Detalhes do lote</button><button type="button" class="btn" id="qr_etq">🏷 Reimprimir etiqueta</button><button type="button" class="btn" data-close>Fechar</button>`,true);
   const b=x=>m.ov.querySelector(x);
   b("#qr_det").onclick=()=>{ m.close(); historico(r.id); };
-  if(b("#qr_rt")) b("#qr_rt").onclick=()=>{ m.close(); formMov(r.id,"saida",null,{preId:key}); };
-  if(b("#qr_fr")) b("#qr_fr").onclick=()=>{ m.close(); formFrac(r.id,key); };
+  b("#qr_etq").onclick=()=>{ m.close(); formEtiquetas(r.id,tem?[key]:null); };
+  m.ov.addEventListener("click",ev=>{ const o=ev.target.closest(".qrop"); if(!o) return; const c=o.dataset.c; m.close();
+    if(c==="__frac") formFrac(r.id,key);
+    else if(c==="Descarte") formMov(r.id,"descarte",null,{preId:key,lock:true});
+    else formMov(r.id,"saida",null,{preId:key,cat:c,lock:true}); });
 }
 const WA_DEF={minUn:1,minKg:0,pendDias:2,fracDias:7,recDias:7,fone:""};
 const waCfg=()=>({...WA_DEF,...(S.cfg.wa||{})});
