@@ -329,6 +329,22 @@ td>.rowacts{min-width:172px}
 .ibtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ibtn:hover{background:var(--sunk)}
 .ibtn .count{position:absolute;top:-4px;right:-6px}
+.etq{width:150mm;height:100mm;box-sizing:border-box;padding:3mm;background:#fff;color:#000;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.etq *{box-sizing:border-box}
+.etq .eb{height:100%;border:.5mm solid #000;border-radius:5mm;padding:2.2mm 4mm 2.4mm;display:flex;flex-direction:column}
+.etq .eh{display:flex;align-items:center;gap:3mm}.etq .eh img{width:20mm;height:20mm;object-fit:contain;flex:none}
+.etq .en{font-size:7.6mm;line-height:1.05;white-space:nowrap}.etq .ea{font-size:2.9mm;line-height:1.2;margin-top:1.4mm}
+.etq .ep{text-align:center;font-size:6.4mm;line-height:1.1;margin-top:2.4mm}.etq .ep.lg{font-size:4.8mm}
+.etq .el{text-align:center;font-size:9mm;line-height:1.15;margin-top:1mm;white-space:nowrap}
+.etq .em{display:flex;align-items:center;gap:3mm;margin-top:1.2mm;flex:1;min-height:0}.etq .ed{flex:1;font-size:5.6mm;line-height:1.36;min-width:0}
+.etq .eq{width:27mm;height:27mm;flex:none}.etq .eq svg{width:100%;height:100%;display:block}
+.etq .ef{display:flex;align-items:flex-end;justify-content:space-between;gap:3mm}.etq .ew{font-size:6mm;line-height:1.1}.etq .emp{font-size:3.2mm;margin-top:1mm}
+.etq .ei{font-size:11.5mm;line-height:1;text-align:right;white-space:nowrap}.etq .eemb{font-size:3.3mm;line-height:1.3;text-align:right}
+.etqprev{background:var(--sunk);border-radius:12px;padding:12px;overflow:hidden}.etqprev .etq{transform-origin:top left;box-shadow:0 4px 18px rgba(0,0,0,.18);border-radius:2mm}
+#printArea{display:none}
+@media print{body>*:not(#printArea){display:none!important}#printArea{display:block!important}html,body{background:#fff!important;margin:0!important;padding:0!important}
+  .etq-pg{overflow:hidden;page-break-after:always;break-after:page;position:relative}.etq-pg:last-child{page-break-after:auto;break-after:auto}
+  .etq-pg.rot .etq{transform:translateX(100mm) rotate(90deg);transform-origin:top left}}
 .wa-card{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;border-left:4px solid #25a35a}
 .wa-card .wa-ch{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:240px}
 .wa-btn{background:#25a35a!important;border-color:#1f8a4c!important;color:#fff!important}
@@ -933,6 +949,7 @@ function refresh(force){
   const el=$("#data"); if(!el) return;
   const datas={evidencias:dataEvid, painel:dataPainel, estoque:dataEstoque, movs:dataMovs, vencidas:dataVencidas, clientes:dataClientes, cadastros:dataCadastros};
   el.innerHTML = S.mode==="loading" ? `<div class="empty">Carregando…</div>` : datas[S.tab]();
+  qrCheck();
   ["btnNova","btnRetirar"].forEach(id=>$("#"+id).disabled=S.readonly);
   ["btnSair","btnSair2","ibSair"].forEach(i=>{ const b=$("#"+i); if(b) b.hidden=S.mode!=="db"; });
   const ac=$("#accChip"); if(ac){ ac.textContent=S.mode==="db"?ROLE_LABEL[S.role]+(S.isOwner?" · proprietária":""):""; ac.hidden=S.mode!=="db"; }
@@ -1291,6 +1308,7 @@ function shellEstoque(){
       ${[["ativas","Em estoque"],["ok","Ok"],["avencer","A vencer"],["vencida","Vencidas"],["esgotada","Esgotadas"],["descartada","Descartadas"],["todas","Todas"]].map(([v,l])=>`<option value="${v}"${f.status===v?" selected":""}>${l}</option>`).join("")}</select></div>
     <div class="field dsk"><label for="floc">Localização</label><select id="floc">${opts(locais,f.local,"Todas")}</select></div>
     <div class="field dsk"><label for="ftp">Tipo</label><select id="ftp">${opts(S.cfg.tipos,f.tipo,"Todos")}</select></div>
+    <button type="button" class="btn" data-act="etqlote" title="Imprimir as etiquetas com QR code das amostras cadastradas">🏷 Imprimir etiquetas</button>
     ${S.readonly?"":`<button type="button" class="btn" data-act="mudarlocais" title="Mudar o local de vários lotes de uma vez">📍 Mudar local de lotes</button>`}
     <div class="field"><label for="fso">Ordenar por</label><select id="fso">
       ${[["validade","Validade (mais próxima)"],["produto","Produto (A–Z)"],["fabricacao","Fabricação (recente)"],["saldo","Saldo (maior)"]].map(([v,l])=>`<option value="${v}"${f.sort===v?" selected":""}>${l}</option>`).join("")}</select></div>
@@ -1563,6 +1581,11 @@ function dataCadastros(){
     <div class="toolbar">${f("wa_minun","Estoque baixo: saldo até (un)",c.minUn)}${f("wa_minkg","ou peso até (kg) · 0 = não usar",c.minKg)}${f("wa_pend","Confirmação pendente há (dias)",c.pendDias)}${f("wa_frac","Fracionamento sem frascos há (dias)",c.fracDias)}${f("wa_rec","Recusas dos últimos (dias)",c.recDias)}</div>
     <div class="toolbar"><div class="field grow"><label for="wa_cfgfone">Número padrão <span class="thu">opcional</span></label><input id="wa_cfgfone" type="tel" placeholder="Em branco: escolher o grupo ou contato na hora" value="${esc(c.fone||"")}"${ro?" disabled":""}></div>
     <button class="btn" data-act="savewa"${ro?" disabled":""}>Salvar</button><button type="button" class="btn wa-btn" data-act="wa">Testar mensagem</button></div></div>`; })()}
+  ${(()=>{ const c=etqCfg(); const f=(id,l,v,w)=>`<div class="field" style="flex:${w||"1 1 220px"}"><label for="${id}">${l}</label><input id="${id}" value="${esc(v)}"${ro?" disabled":""}></div>`;
+    return `<div class="panel"><h2>Etiqueta das amostras <small>com QR code</small></h2>
+    <p class="sub" style="margin:0">Imprima em <b>Detalhes do lote → Etiquetas</b>. Produto, lote, datas, peso, MAPA e ID vêm do cadastro. A temperatura depende do armazenamento de cada produto (coluna Armazenamento em Produtos acabados).</p>
+    <div class="toolbar">${f("et_emp","Empresa",c.empresa,"1 1 260px")}${f("et_end","Endereço",c.endereco,"3 1 360px")}</div>
+    <div class="toolbar">${f("et_tc","Temperatura · congelados",c.tempCong)}${f("et_ta","Temperatura · ambiente (asséptico)",c.tempAmb)}<button class="btn" data-act="saveetq"${ro?" disabled":""}>Salvar</button></div></div>`; })()}
   <div class="panel"><h2>Alerta de vencimento</h2>
     <div class="toolbar"><div class="field" style="flex:0 1 220px"><label for="cfgal">Avisar com quantos dias de antecedência</label><input id="cfgal" type="number" min="1" max="730" value="${esc(S.cfg.alerta)}"${ro?" disabled":""}></div>
     <button class="btn" data-act="savealerta"${ro?" disabled":""}>Salvar</button></div>
@@ -1571,8 +1594,8 @@ function dataCadastros(){
     <p class="sub" style="margin:0">Ao escolher o produto no cadastro da amostra, o registro MAPA e o código interno são preenchidos sozinhos.</p>
     ${(()=>{ if(ro) return ""; const c=codigosPendentes(); return c.prods.length||c.lotes.length?`<div class="banner" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between"><span><b>Códigos internos:</b> ${c.prods.length?`${c.prods.length} produto${c.prods.length===1?"":"s"} sem código ${c.prods.length===1?"tem":"têm"} o código na planilha de produtos`:"os produtos já têm código"}${c.lotes.length?` · ${c.lotes.length} lote${c.lotes.length===1?"":"s"} em estoque ${c.lotes.length===1?"fica":"ficam"} com o código do produto`:""}. Códigos já preenchidos não são alterados.</span><button class="btn primary sm" data-act="aplicarcod">Aplicar códigos</button></div>`:""; })()}
     ${ro?"":`<form class="addprod toolbar"><div class="field grow"><label for="np_nome">Nome comercial</label><input id="np_nome" required></div><div class="field"><label for="np_mapa">Registro MAPA</label><input id="np_mapa" placeholder="CE 001014-6.000000" style="font-family:var(--mono)"></div><div class="field" style="flex:0 1 150px"><label for="np_cod">Código interno</label><input id="np_cod" inputmode="numeric" style="font-family:var(--mono)"></div><div class="field"><label for="np_cat">Categoria</label><select id="np_cat"><option>Orgânico</option><option>Convencional</option></select></div><button class="btn" type="submit">Adicionar produto</button></form>`}
-    <div class="tablebox"><table><thead><tr><th>Produto</th><th>Registro MAPA</th><th>Código interno</th><th>Categoria</th><th>Par para reclassificação</th><th></th></tr></thead><tbody>
-    ${PRODS().map((p,i)=>`<tr class="row"><td class="prod">${esc(p.nome)}</td><td class="mono">${esc(p.mapa||"—")}</td><td>${ro?`<span class="mono">${esc(p.codigo||"—")}</span>`:`<input class="codinp" data-i="${i}" value="${esc(p.codigo||"")}" inputmode="numeric" placeholder="—" aria-label="Código interno de ${esc(p.nome)}" style="width:96px;min-height:36px;font-family:var(--mono)">`}</td><td>${esc(p.categoria||"")}</td><td>${p.categoria==="Orgânico"&&!ro?`<select class="parsel" data-i="${i}" aria-label="Par convencional de ${esc(p.nome)}" style="max-width:280px"><option value="">—</option>${PRODS().filter(x=>x.categoria==="Convencional").map(x=>`<option${x.nome===p.par?" selected":""}>${esc(x.nome)}</option>`).join("")}</select>`:`<span class="sub">${esc(p.par||"")}</span>`}</td><td><div class="rowacts">${ro?"":`<button class="btn sm" data-act="rmprod" data-i="${i}" aria-label="Remover ${esc(p.nome)}">Remover</button>`}</div></td></tr>`).join("")||`<tr><td colspan="6" class="muted">Nenhum produto cadastrado.</td></tr>`}
+    <div class="tablebox"><table><thead><tr><th>Produto</th><th>Registro MAPA</th><th>Código interno</th><th>Armazenamento</th><th>Categoria</th><th>Par para reclassificação</th><th></th></tr></thead><tbody>
+    ${PRODS().map((p,i)=>`<tr class="row"><td class="prod">${esc(p.nome)}</td><td class="mono">${esc(p.mapa||"—")}</td><td>${ro?`<span class="mono">${esc(p.codigo||"—")}</span>`:`<input class="codinp" data-i="${i}" value="${esc(p.codigo||"")}" inputmode="numeric" placeholder="—" aria-label="Código interno de ${esc(p.nome)}" style="width:96px;min-height:36px;font-family:var(--mono)">`}</td><td>${ro?esc(armProd(p.nome)==="ambiente"?"Ambiente":"Congelado"):`<select class="arminp" data-i="${i}" aria-label="Armazenamento de ${esc(p.nome)}" style="min-height:36px"><option value="congelado"${armProd(p.nome)==="congelado"?" selected":""}>Congelado</option><option value="ambiente"${armProd(p.nome)==="ambiente"?" selected":""}>Ambiente (asséptico)</option></select>`}</td><td>${esc(p.categoria||"")}</td><td>${p.categoria==="Orgânico"&&!ro?`<select class="parsel" data-i="${i}" aria-label="Par convencional de ${esc(p.nome)}" style="max-width:280px"><option value="">—</option>${PRODS().filter(x=>x.categoria==="Convencional").map(x=>`<option${x.nome===p.par?" selected":""}>${esc(x.nome)}</option>`).join("")}</select>`:`<span class="sub">${esc(p.par||"")}</span>`}</td><td><div class="rowacts">${ro?"":`<button class="btn sm" data-act="rmprod" data-i="${i}" aria-label="Remover ${esc(p.nome)}">Remover</button>`}</div></td></tr>`).join("")||`<tr><td colspan="7" class="muted">Nenhum produto cadastrado.</td></tr>`}
     </tbody></table></div></div>
   ${(()=>{ const C=S.clientes.slice().sort((a,b)=>(a.tipo||"").localeCompare(b.tipo||"","pt")||a.nome.localeCompare(b.nome,"pt")); const st=statsClientes();
     return `<div class="panel"><h2>Clientes e laboratórios externos <small>${C.length} cadastrado${C.length===1?"":"s"}</small></h2>
@@ -1628,6 +1651,9 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="ajustar") ajustarLote(id);
   else if(act==="novocli") formCliente();
   else if(act==="wa") formWA();
+  else if(act==="etqlote") formEtqLote();
+  else if(act==="saveetq"){ const v=k=>$("#"+k).value.trim(); const etq={empresa:v("et_emp")||ETQ_DEF.empresa,endereco:v("et_end"),tempCong:v("et_tc")||ETQ_DEF.tempCong,tempAmb:v("et_ta")||ETQ_DEF.tempAmb};
+    await guard(()=>store.saveCfg({...S.cfg,etq}),"Etiqueta salva"); refresh(true); }
   else if(act==="savewa"){ const g=(k,min,def)=>{ const v=String($("#"+k).value).replace(",","."); const n=parseFloat(v); return isNaN(n)?def:Math.max(min,n); };
     const wa={minUn:g("wa_minun",0,1),minKg:g("wa_minkg",0,0),pendDias:Math.round(g("wa_pend",0,2)),fracDias:Math.round(g("wa_frac",0,7)),recDias:Math.round(g("wa_rec",0,7)),fone:$("#wa_cfgfone").value.trim()};
     await guard(()=>store.saveCfg({...S.cfg,wa}),"Avisos salvos"); refresh(true); }
@@ -1662,6 +1688,8 @@ $("#main").addEventListener("change", async e=>{ if(e.target.id==="impfile") ler
   if(e.target.classList&&e.target.classList.contains("codinp")){ const i=+e.target.dataset.i, v=e.target.value.trim(); const P=PRODS(); if(!P[i]||String(P[i].codigo||"")===v) return;
     const dup=P.find((x,j)=>j!==i&&v&&String(x.codigo||"")===v);
     await guard(()=>store.saveCfg({...S.cfg,produtos:P.map((x,j)=>j===i?{...x,codigo:v}:x)}),dup?`Código salvo (atenção: ${v} também está em ${dup.nome})`:"Código interno salvo"); }
+  if(e.target.classList&&e.target.classList.contains("arminp")){ const i=+e.target.dataset.i, v=e.target.value; const P=PRODS(); if(!P[i]) return;
+    await guard(()=>store.saveCfg({...S.cfg,produtos:P.map((x,j)=>j===i?{...x,arm:v}:x)}),"Armazenamento salvo"); }
   if(e.target.id==="cenaSel"){ LS.set("cena",e.target.value); aplicarCena(); toast("Animação: "+e.target.options[e.target.selectedIndex].text); }
   if(e.target.classList&&e.target.classList.contains("accsel")) await saveAcesso(e.target.dataset.uid,e.target.value);
   if(e.target.id==="accF"){ ACC_F=e.target.value; refresh(true); }
@@ -1742,7 +1770,8 @@ function formAmostra(a){
     if(d.responsavel) LS.set("resp",d.responsavel);
     m.close();
     if(ed) await guard(()=>store.updateAmostra(a.id,{...d,atualizadoEm:hoje()}),"Amostra atualizada");
-    else { d.ids=NST.ids; d.idsQ=NST.q; d.idsKg=NST.kg; d.idsEmb=NST.emb; await guard(()=>store.addAmostra(d,qtd,d.responsavel),"Amostra cadastrada"); }
+    else { d.ids=NST.ids; d.idsQ=NST.q; d.idsKg=NST.kg; d.idsEmb=NST.emb; let nid=null; const okA=await guard(async()=>{ nid=await store.addAmostra(d,qtd,d.responsavel); },"Amostra cadastrada");
+      if(okA&&nid) setTimeout(()=>toast("Cadastrou todas? Imprima as etiquetas em Estoque → 🏷 Imprimir etiquetas"),2600); }
   };
 }
 
@@ -1863,6 +1892,7 @@ function formMov(id, tipo, clienteId, opt){
       :`<div class="sub" style="padding:10px 12px">Nenhum lote ${tipo==="entrada"?"":"com saldo "}com esse número.</div>`; };
   if(!id){ const li=q("#m_lotq"); li.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); const f=q("#m_lotsug .lsug"); if(f) escolherLote(f.dataset.id); } }); setTimeout(()=>li.focus(),60); }
   upd();
+  if(opt.preId&&r&&out){ const io0=idsOf(r); if(io0.ids.includes(opt.preId)&&avail(io0,opt.preId)>0&&tipo!=="descarte"){ selQ={[opt.preId]:1}; paint(); } }
   m.form.onsubmit=async e=>{
     e.preventDefault(); const err=q("#m_err"); if(!r){ err.textContent="Digite o lote e escolha a amostra."; q("#m_lotq").focus(); return; }
     let RW=null; if(!out){ const v=RE.validate(); if(v.err){ err.textContent=v.err; return; } if(!v.rows.length){ err.textContent="Inclua pelo menos uma linha com o ID da amostra que entra."; return; } RW=v.rows; q("#m_qtd").value=RW.reduce((s,x)=>s+x.n,0); }
@@ -1899,7 +1929,7 @@ function formMov(id, tipo, clienteId, opt){
 }
 
 /* Fracionamento: um volume (ex.: saco valvulado) é aberto para o laboratório interno; o restante volta em frascos */
-function formFrac(id){
+function formFrac(id,pre){
   if(S.readonly) return; const R=rows(); const r=R.find(x=>x.id===id);
   if(!r||r.disp<=0||r.descartada){ toast("Este lote não tem saldo disponível para fracionar."); return; }
   const io=idsOf(r), RES=reservas(r.id); const unOf=i=>(io.q&&io.q[i])||1; const avail=i=>Math.max(0,unOf(i)-(RES[i]||0)); const kgU=i=>(Number(io.kg[i])||0)/unOf(i);
@@ -1943,7 +1973,7 @@ function formFrac(id){
     if(p){ selQ[p.dataset.id]=Math.min(avail(p.dataset.id),selQ[p.dataset.id]+1); paint(); } else if(mi){ selQ[mi.dataset.id]=Math.max(1,selQ[mi.dataset.id]-1); paint(); } else if(x){ delete selQ[x.dataset.id]; paint(); } });
   q("#fr_kg").addEventListener("input",ev=>{ ev.target.dataset.touched=ev.target.value.trim()?"1":""; bal(); });
   q("#fr_depois").addEventListener("change",ev=>{ q("#fr_rowsw").hidden=ev.target.checked; bal(); });
-  if(livres.length===1&&unOf(livres[0])===1){ selQ[livres[0]]=1; }
+  if(pre&&livres.includes(pre)) selQ[pre]=1; else if(livres.length===1&&unOf(livres[0])===1){ selQ[livres[0]]=1; }
   paint();
   m.form.onsubmit=async e=>{ e.preventDefault(); const err=q("#fr_err");
     const qtd=Number(q("#fr_qtd").value); const resp=q("#fr_resp").value, data=q("#fr_data").value, depois=q("#fr_depois").checked;
@@ -2138,8 +2168,9 @@ function historico(id){
    ${M.map(m=>`<tr><td class="mono">${fmtD(m.data)}</td><td class="mv-${m.tipo}"><b>${MV_LABEL[m.tipo]||esc(m.tipo)}</b></td><td class="num">${Number(m.qtd)===0?"":((m.tipo==="entrada"||m.tipo==="reclass_in"||(m.tipo==="ajuste"&&m.qtd>0))?"+":"−")}${nf(Math.abs(m.qtd))}</td><td>${esc(m.motivo)}</td><td>${esc(m.destino)}</td><td>${esc(m.responsavel)}</td><td class="sub">${esc(m.obs||"")}${m.ids?` · ID ${esc(m.ids)}`:""}</td></tr>`).join("")||`<tr><td colspan="7" class="muted">Sem movimentações.</td></tr>`}
    </tbody></table></div>`;
   const ro=S.readonly;
-  const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&!r.descartada?`<button type="button" class="btn" id="h_lc">Mudar local</button>`:""}${!ro&&r.disp>0&&!r.descartada?`<button type="button" class="btn" id="h_fr">Fracionar</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
+  const m=modal("Detalhes da amostra",body,`${ro||!FULL()?"":`<button type="button" class="btn" id="h_ed" style="margin-right:auto">Editar cadastro</button>`}${!ro&&FULL()&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rc">Reclassificar</button>`:""}${!ro&&FULL()&&!r.descartada?`<button type="button" class="btn" id="h_aj">Ajustar volumes e saldo</button>`:""}${!ro&&!r.descartada?`<button type="button" class="btn" id="h_lc">Mudar local</button>`:""}${io.ids.length?`<button type="button" class="btn" id="h_etq">🏷 Etiquetas</button>`:""}${!ro&&r.disp>0&&!r.descartada?`<button type="button" class="btn" id="h_fr">Fracionar</button>`:""}${!ro&&r.saldo>0&&!r.descartada?`<button type="button" class="btn" id="h_rt">Retirar</button>`:""}<button type="button" class="btn primary" data-close>Fechar</button>`,true);
   const fr=m.ov.querySelector("#h_fr"); if(fr) fr.onclick=()=>{ m.close(); formFrac(id); };
+  const et=m.ov.querySelector("#h_etq"); if(et) et.onclick=()=>{ m.close(); formEtiquetas(id); };
   m.ov.addEventListener("click",ev=>{ const a=ev.target.closest(".hfr"), b=ev.target.closest(".hff"); if(a){ m.close(); formMov(id,"entrada",null,{fracId:(S.movs.find(x=>x.id===a.dataset.id)||{}).fracId}); }
     if(b){ m.close(); fecharFrac(b.dataset.id); } });
   const lc=m.ov.querySelector("#h_lc"); if(lc) lc.onclick=()=>{ m.close(); mudarLocal([id]); };
@@ -2196,6 +2227,129 @@ async function doImport(){
 
 /* ======================= Avisos pelo WhatsApp ======================= */
 /* Sem servidor: o app monta a mensagem e abre o WhatsApp com o texto pronto; a pessoa escolhe o grupo ou contato e envia. */
+const ETQ_DEF={empresa:"MERI POBO AGROPECUÁRIA LTDA",endereco:"Estrada Carroçavel S/N Zona Rural CEP 62823-000 Jaguaruana CE - Brazil",tempCong:"- 18 °C (±3)",tempAmb:"Ambiente"};
+const etqCfg=()=>({...ETQ_DEF,...(S.cfg.etq||{})});
+const armProd=nome=>{ const p=PRODS().find(x=>norm(x.nome)===norm(nome)); if(p&&p.arm) return p.arm; return /(ass[eé]ptic|asept|ambiente)/i.test(nome||"")?"ambiente":"congelado"; };
+const QR_LIB="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
+const qrSvg=txt=>{ const q=qrcode(0,"L"); q.addData(txt); q.make(); const n=q.getModuleCount(); let d=""; for(let y=0;y<n;y++) for(let x=0;x<n;x++) if(q.isDark(y,x)) d+=`M${x} ${y}h1v1h-1z`;
+  return `<svg viewBox="-1 -1 ${n+2} ${n+2}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-hidden="true"><path d="${d}" fill="#000"/></svg>`; };
+const qrEnc=k=>encodeURIComponent(k).replace(/%20/g,"+").replace(/%28/g,"(").replace(/%29/g,")").replace(/%2C/gi,",");
+const qrDec=k=>decodeURIComponent(String(k).replace(/\+/g," "));
+const qrUrl=(aid,key)=>`${location.origin}${location.pathname}#qr=${encodeURIComponent(aid)}~${qrEnc(key)}`;
+function etqHTML(r,key){
+  const io=idsOf(r), C=etqCfg(); const e=io.emb[key]||""; const un=(io.q&&io.q[key])||1; const kgU=(Number(io.kg[key])||0)/un;
+  const P=PRODS().find(p=>norm(p.nome)===norm(r.produto))||{}; const mapa=r.mapa||P.mapa||"";
+  const temp=armProd(r.produto)==="ambiente"?C.tempAmb:C.tempCong; const lg=document.querySelector(".wlogo"); const logo=lg&&lg.src?lg.src:"";
+  const lote=String(r.lote||"").replace(/\s*-\s*/g," - ");
+  return `<div class="etq"><div class="eb">
+    <div class="eh">${logo?`<img src="${logo}" alt="">`:""}<div style="min-width:0"><div class="en">${esc(C.empresa)}</div><div class="ea">${esc(C.endereco)}</div></div></div>
+    <div class="ep${String(r.produto).length>46?" lg":""}">${esc(r.produto)}</div>
+    <div class="el">Amostra do Lote: ${esc(lote)}</div>
+    <div class="em"><div class="ed"><div>Data de Fabricação: ${fmtD(r.fabricacao)}</div><div>Data de Validade: ${fmtD(r.validade)}</div><div>Temperatura de Armazenamento: ${esc(temp)}</div></div>
+      <div class="eq">${window.qrcode?qrSvg(qrUrl(r.id,key)):""}</div></div>
+    <div class="ef"><div><div class="ew">Peso: ${kgU?String(Math.round(kgU*1000))+" g":"________ g"}</div>${mapa?`<div class="emp">MAPA Registration: ${esc(mapa)}</div>`:""}</div>
+      <div>${e?`<div class="eemb">${esc(e)}</div>`:""}<div class="ei">ID: ${esc(baseId(key,e))}</div></div></div>
+  </div></div>`;
+}
+async function esperaLote(id){ for(let i=0;i<30&&!rows().find(x=>x.id===id);i++) await new Promise(o=>setTimeout(o,100)); return rows().find(x=>x.id===id); }
+async function formEtiquetas(id,pre){
+  const r=await esperaLote(id); if(!r){ toast("Lote não encontrado."); return; }
+  try{ if(!window.qrcode) await loadScript(QR_LIB); }catch(e){ toast("O gerador de QR code não carregou. As etiquetas sairão sem QR code."); }
+  const io=idsOf(r); if(!io.ids.length){ toast("Este lote não tem IDs registrados para gerar etiquetas."); return; }
+  const preset=pre&&pre.length?new Set(pre):null; const orient=LS.get("etqOri","pais");
+  const body=`<div class="ref full"><div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span> · validade ${fmtD(r.validade)}</div></div><div>${pill(r.st)}</div></div>
+    <div class="full"><div class="sub" style="margin-bottom:6px">Etiquetas a imprimir · uma por volume</div><div class="lchkbox" style="max-height:240px;overflow:auto">
+      ${io.ids.map(k=>{ const un=(io.q&&io.q[k])||1; const on=preset?preset.has(k):true; return `<label class="lchk"><input type="checkbox" class="etk" value="${esc(k)}"${on?" checked":""}><span style="flex:1;font-family:var(--mono)">${esc(idLabel(k,io.q,io.kg,io.emb))}</span><input type="number" class="etn" data-k="${esc(k)}" min="1" max="99" value="${un}" aria-label="Cópias de ${esc(k)}" style="width:64px;min-height:34px;text-align:right"></label>`; }).join("")}
+    </div></div>
+    <div class="field full"><label for="et_ori">Formato da impressora</label><select id="et_ori"><option value="pais"${orient==="pais"?" selected":""}>15 × 10 cm deitada (como a etiqueta atual)</option><option value="ret"${orient==="ret"?" selected":""}>10 × 15 cm em pé (o app gira a etiqueta)</option></select>
+      <div class="sub" style="margin-top:4px">Na janela de impressão: escolha a impressora de etiquetas, tamanho do papel 100 × 150 mm, margens “Nenhuma” e escala 100%.</div></div>
+    <div class="full"><div class="sub" style="margin-bottom:6px">Prévia</div><div class="etqprev" id="et_prev"></div></div>`;
+  const m=modal("Imprimir etiquetas",body,`<button type="button" class="btn" data-close>Fechar</button><button type="submit" class="btn primary" id="et_go">Imprimir</button>`,true);
+  const q=x=>m.ov.querySelector(x);
+  const lista=()=>[...m.ov.querySelectorAll(".etk")].filter(c=>c.checked).map(c=>({k:c.value,n:Math.max(1,Math.min(99,parseInt(m.ov.querySelector(`.etn[data-k="${CSS.escape(c.value)}"]`).value)||1))}));
+  const prev=()=>{ const L=lista(); const box=q("#et_prev"); const tot=L.reduce((s,x)=>s+x.n,0); q("#et_go").textContent=tot?`Imprimir ${tot} etiqueta${tot===1?"":"s"}`:"Imprimir"; q("#et_go").disabled=!tot;
+    if(!L.length){ box.innerHTML=`<span class="sub">Marque pelo menos um ID.</span>`; box.style.height=""; return; }
+    box.innerHTML=etqHTML(r,L[0].k); const el=box.querySelector(".etq"); const w=box.clientWidth-24; const sc=Math.min(1.3,w/el.offsetWidth); el.style.transform=`scale(${sc})`; box.style.height=(el.offsetHeight*sc+24)+"px"; };
+  m.ov.addEventListener("change",prev); m.ov.addEventListener("input",ev=>{ if(ev.target.classList.contains("etn")) prev(); });
+  setTimeout(prev,30); window.addEventListener("resize",prev,{once:true});
+  m.form.onsubmit=e=>{ e.preventDefault(); const L=lista(); if(!L.length) return; const ori=q("#et_ori").value; LS.set("etqOri",ori);
+    const pages=[]; L.forEach(x=>{ const h=etqHTML(r,x.k); for(let i=0;i<x.n;i++) pages.push(h); });
+    const imp=etqImpressas(); imp.add(r.id); LS.set("etqPrint",JSON.stringify([...imp].slice(-2000)));
+    m.close(); imprimirEtq(pages,ori); };
+}
+/* Etiquetas em lote: cadastra todas as amostras e depois imprime de uma vez (antes ou depois da confirmação) */
+const dLocal=v=>{ const d=new Date(v); if(isNaN(d)) return ""; const p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+const etqImpressas=()=>{ try{ return new Set(JSON.parse(LS.get("etqPrint","[]"))); }catch(e){ return new Set(); } };
+function situCadastro(id){ const c=S.movs.filter(m=>m.amostraId===id&&m.motivo==="Cadastro inicial"); if(c.some(m=>m.status==="pendente")) return "pendente"; if(c.length&&c.every(m=>m.status==="recusada")) return "recusada"; return "confirmada"; }
+async function formEtqLote(){
+  try{ if(!window.qrcode) await loadScript(QR_LIB); }catch(e){ toast("O gerador de QR code não carregou. As etiquetas sairão sem QR code."); }
+  const hj=hoje(); const ori0=LS.get("etqOri","pais");
+  const body=`<p class="sub full" style="margin:0">Cadastre todas as amostras e depois imprima as etiquetas aqui, de uma vez. Dá para imprimir antes da confirmação: o saldo só entra no estoque quando alguém com <b>acesso total</b> confirmar o cadastro.</p>
+    <div class="full" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+      <div class="field"><label for="el_de">Cadastradas de</label><input id="el_de" type="date" value="${hj}"></div>
+      <div class="field"><label for="el_ate">até</label><input id="el_ate" type="date" value="${hj}"></div>
+      <div class="field"><label for="el_q">Buscar lote ou produto</label><input id="el_q" autocomplete="off" placeholder="Todos"></div></div>
+    <div class="full"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span class="sub" id="el_sum" style="flex:1;min-width:200px"></span><button type="button" class="btn sm" id="el_all">Marcar todos</button><button type="button" class="btn sm" id="el_new">Só as não impressas</button><button type="button" class="btn sm" id="el_none">Limpar</button></div>
+      <div class="lchkbox" id="el_list" style="max-height:300px;overflow:auto"></div></div>
+    <div class="field full"><label for="el_ori">Formato da impressora</label><select id="el_ori"><option value="pais"${ori0==="pais"?" selected":""}>15 × 10 cm deitada (como a etiqueta atual)</option><option value="ret"${ori0==="ret"?" selected":""}>10 × 15 cm em pé (o app gira a etiqueta)</option></select>
+      <div class="sub" style="margin-top:4px">Uma etiqueta por volume de cada ID. Na janela de impressão: impressora de etiquetas, papel 100 × 150 mm, margens “Nenhuma” e escala 100%.</div></div>
+    <div class="full"><div class="sub" style="margin-bottom:6px">Prévia da primeira etiqueta</div><div class="etqprev" id="el_prev"></div></div>`;
+  const m=modal("Imprimir etiquetas",body,`<button type="button" class="btn" data-close>Fechar</button><button type="submit" class="btn primary" id="el_go">Imprimir</button>`,true);
+  const q=x=>m.ov.querySelector(x); const SEL=new Set(); let primeira=true;
+  const nEtq=r=>{ const io=idsOf(r); return io.ids.reduce((s,k)=>s+((io.q&&io.q[k])||1),0); };
+  const lista=()=>{ const de=q("#el_de").value, ate=q("#el_ate").value, t=norm(q("#el_q").value.trim());
+    return rows().filter(r=>!r.descartada&&idsOf(r).ids.length&&situCadastro(r.id)!=="recusada").filter(r=>{ const d=dLocal(r.criadoEm)||r.atual||""; return (!de||d>=de)&&(!ate||d<=ate)&&(!t||norm(r.lote+" "+r.produto).includes(t)); })
+      .sort((a,b)=>String(a.criadoEm||"").localeCompare(String(b.criadoEm||""))); };
+  const draw=()=>{ const L=lista(), imp=etqImpressas();
+    if(primeira){ L.forEach(r=>{ if(!imp.has(r.id)) SEL.add(r.id); }); primeira=false; }
+    q("#el_list").innerHTML=L.length?L.map(r=>{ const sc=situCadastro(r.id); return `<label class="lchk"><input type="checkbox" class="elk" value="${r.id}"${SEL.has(r.id)?" checked":""}><span style="flex:1;min-width:0"><b>${esc(r.produto)}</b> · lote <b style="font-family:var(--mono)">${esc(r.lote)}</b><br><span class="sub">${idsOf(r).ids.map(k=>esc(idLabel(k,idsOf(r).q,null,idsOf(r).emb))).join(", ")}</span></span>
+        <span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none"><b style="font-family:var(--mono)">${nEtq(r)} etq.</b>${sc==="pendente"?`<span class="sub" style="color:var(--warn)">⏳ aguardando confirmação</span>`:`<span class="sub" style="color:var(--ok)">✓ confirmado</span>`}${imp.has(r.id)?`<span class="sub">já impressa neste aparelho</span>`:""}</span></label>`; }).join("")
+      :`<div class="sub" style="padding:12px">Nenhuma amostra cadastrada nesse período.</div>`;
+    const sel=L.filter(r=>SEL.has(r.id)); const tot=sel.reduce((s,r)=>s+nEtq(r),0);
+    q("#el_sum").innerHTML=`${L.length} lote${L.length===1?"":"s"} no período · <b>${sel.length}</b> marcado${sel.length===1?"":"s"} · <b>${tot}</b> etiqueta${tot===1?"":"s"}`;
+    q("#el_go").textContent=tot?`Imprimir ${tot} etiqueta${tot===1?"":"s"}`:"Imprimir"; q("#el_go").disabled=!tot;
+    const box=q("#el_prev"); const r0=sel[0];
+    if(!r0){ box.innerHTML=`<span class="sub">Marque pelo menos um lote.</span>`; box.style.height=""; return; }
+    box.innerHTML=etqHTML(r0,idsOf(r0).ids[0]); const el=box.querySelector(".etq"); const w=box.clientWidth-24; const sc=Math.min(1.1,w/el.offsetWidth); el.style.transform=`scale(${sc})`; box.style.height=(el.offsetHeight*sc+24)+"px"; };
+  m.ov.addEventListener("change",ev=>{ const c=ev.target.closest(".elk"); if(c){ if(c.checked) SEL.add(c.value); else SEL.delete(c.value); } draw(); });
+  q("#el_q").addEventListener("input",draw);
+  q("#el_all").onclick=()=>{ lista().forEach(r=>SEL.add(r.id)); draw(); };
+  q("#el_new").onclick=()=>{ const imp=etqImpressas(); SEL.clear(); lista().forEach(r=>{ if(!imp.has(r.id)) SEL.add(r.id); }); draw(); };
+  q("#el_none").onclick=()=>{ SEL.clear(); draw(); };
+  setTimeout(draw,30);
+  m.form.onsubmit=e=>{ e.preventDefault(); const sel=lista().filter(r=>SEL.has(r.id)); if(!sel.length) return; const ori=q("#el_ori").value; LS.set("etqOri",ori);
+    const pages=[]; sel.forEach(r=>{ const io=idsOf(r); io.ids.forEach(k=>{ const h=etqHTML(r,k); for(let i=0;i<((io.q&&io.q[k])||1);i++) pages.push(h); }); });
+    const imp=etqImpressas(); sel.forEach(r=>imp.add(r.id)); LS.set("etqPrint",JSON.stringify([...imp].slice(-2000)));
+    m.close(); imprimirEtq(pages,ori); };
+}
+function imprimirEtq(pages,ori){
+  let pa=document.getElementById("printArea"); if(!pa){ pa=document.createElement("div"); pa.id="printArea"; document.body.appendChild(pa); }
+  const rot=ori==="ret"; const W=rot?100:150, H=rot?150:100;
+  pa.innerHTML=pages.map(h=>`<div class="etq-pg${rot?" rot":""}" style="width:${W}mm;height:${H}mm">${h}</div>`).join("");
+  let st=document.getElementById("pageSize"); if(!st){ st=document.createElement("style"); st.id="pageSize"; document.head.appendChild(st); }
+  st.textContent=`@page{size:${W}mm ${H}mm;margin:0}`;
+  const fim=()=>{ pa.innerHTML=""; st.textContent=""; window.removeEventListener("afterprint",fim); };
+  window.addEventListener("afterprint",fim); setTimeout(()=>window.print(),120);
+}
+/* QR code lido pela câmera: abre o app em #qr=<amostra>~<ID> */
+var QR_PEND=(location.hash.match(/^#qr=([^~]+)~(.+)$/)||[]).slice(1).map(qrDec);
+window.addEventListener("hashchange",()=>{ const m=location.hash.match(/^#qr=([^~]+)~(.+)$/); if(m){ QR_PEND=[qrDec(m[1]),qrDec(m[2])]; render(); } });
+function qrCheck(){ if(!QR_PEND||!QR_PEND.length||S.mode==="loading"||S.mode==="auth"||!S.amostras.length) return; const [aid,key]=QR_PEND; QR_PEND=[];
+  try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
+  setTimeout(()=>qrAbrir(aid,key),60); }
+function qrAbrir(aid,key){
+  const r=rows().find(x=>x.id===aid); if(!r){ toast("Amostra do QR code não encontrada. Ela pode ter sido excluída."); return; }
+  const io=idsOf(r); const tem=io.ids.includes(key); const e=io.emb[key]||""; const un=(io.q&&io.q[key])||1; const ro=S.readonly;
+  const body=`<div class="ref full"><div><div class="prod">${esc(r.produto)}</div><div class="sub">Lote <span class="lote">${esc(r.lote)}</span> · ${esc(r.local||"sem local")}</div></div><div>${pill(r.st)} <b style="font-family:var(--mono)">${nf(r.saldo)}</b> <span class="sub">${esc(r.unidade||"un")} no lote</span></div></div>
+    <div class="full" style="font-size:15px">${tem?`<b style="font-family:var(--mono);font-size:22px">${esc(baseId(key,e))}</b>${e?` · ${esc(e)}`:""}${un>1?` · ${un} volumes`:""}${io.kg[key]?` · ${fkg(io.kg[key])} kg`:""}`:`<span style="color:var(--warn)">O ID <b>${esc(baseId(key,e)||key)}</b> não está mais em estoque neste lote (já saiu ou foi reclassificado).</span>`}</div>
+    <div class="full sub">Validade ${fmtD(r.validade)} · fabricação ${fmtD(r.fabricacao)}</div>`;
+  const ok=tem&&!ro&&!r.descartada;
+  const m=modal("Amostra lida pelo QR code",body,`<button type="button" class="btn" id="qr_det" style="margin-right:auto">Detalhes</button>${ok&&r.disp>0&&r.st!=="vencida"?`<button type="button" class="btn" id="qr_fr">Fracionar</button>`:""}${ok&&r.saldo>0?`<button type="button" class="btn primary" id="qr_rt">Retirar este ID</button>`:""}`);
+  const b=x=>m.ov.querySelector(x);
+  b("#qr_det").onclick=()=>{ m.close(); historico(r.id); };
+  if(b("#qr_rt")) b("#qr_rt").onclick=()=>{ m.close(); formMov(r.id,"saida",null,{preId:key}); };
+  if(b("#qr_fr")) b("#qr_fr").onclick=()=>{ m.close(); formFrac(r.id,key); };
+}
 const WA_DEF={minUn:1,minKg:0,pendDias:2,fracDias:7,recDias:7,fone:""};
 const waCfg=()=>({...WA_DEF,...(S.cfg.wa||{})});
 const diasDesde=v=>{ if(!v) return 0; const t=new Date(String(v).length<=10?v+"T12:00:00":v).getTime(); return isNaN(t)?0:Math.floor((Date.now()-t)/864e5); };
