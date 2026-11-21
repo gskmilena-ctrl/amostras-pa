@@ -329,6 +329,11 @@ td>.rowacts{min-width:172px}
 .ibtn svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ibtn:hover{background:var(--sunk)}
 .ibtn .count{position:absolute;top:-4px;right:-6px}
+.wa-card{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;border-left:4px solid #25a35a}
+.wa-card .wa-ch{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:240px}
+.wa-btn{background:#25a35a!important;border-color:#1f8a4c!important;color:#fff!important}
+.wa-btn:hover{background:#1f8a4c!important}
+#wa_txt{font-family:var(--mono);font-size:13px;line-height:1.45;min-height:240px;white-space:pre-wrap}
 .bn .bpill{width:56px;height:32px;border-radius:12px;display:grid;place-items:center;transition:background .15s}
 .bn[aria-selected="true"] .bpill{background:var(--accent-soft)}
 @media (max-width:859px){
@@ -597,6 +602,7 @@ td>.rowacts{min-width:172px}
         <div class="actions">
           <button class="btn iconbtn mobonly" id="btnSkin" title="Trocar tema" aria-label="Trocar tema" style="font-size:18px">◐</button>
           <button class="ibtn" id="ibExport" title="Exportar Excel ou PDF" aria-label="Exportar Excel ou PDF"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg></button>
+          <button class="ibtn" id="ibWa" title="Enviar alertas pelo WhatsApp" aria-label="Enviar alertas pelo WhatsApp"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c.3 2 2.5 4.2 4.6 4.6l1.2-1.2 1.7.8c-.3 1.2-1.3 1.8-2.4 1.6-3.2-.6-5.4-2.9-6-6-.2-1.1.4-2.1 1.6-2.4l.8 1.7z" style="stroke-width:1.2"/></svg></button>
           <button class="ibtn" id="ibBell" title="Vencidas" aria-label="Ver vencidas"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="count cntVenc" hidden>0</span></button>
           <button class="ibtn" id="ibSkin" title="Trocar tema" aria-label="Trocar tema"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" style="fill:currentColor"/></svg></button>
           <button class="ibtn" id="ibSair" title="Sair" aria-label="Sair" hidden><svg viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg></button>
@@ -897,6 +903,7 @@ applySkin(LS.get("skin","ouro"));
 document.getElementById("skinSel").addEventListener("change",e=>applySkin(e.target.value));
 document.getElementById("ibSkin").addEventListener("click",()=>document.getElementById("btnSkin").click());
 document.getElementById("ibBell").addEventListener("click",()=>{ setTab("vencidas"); window.scrollTo(0,0); });
+document.getElementById("ibWa").addEventListener("click",()=>formWA());
 document.getElementById("ibExport").addEventListener("click",()=>exportMenu());
 document.getElementById("ibSair").addEventListener("click",()=>sairApp());
 window.matchMedia("(max-width:859px)").addEventListener("change",()=>render());
@@ -1207,7 +1214,7 @@ function dataPainel(){
   const saidas=saidasAll();
   const hn=S.hist.reduce((s,x)=>s+(Number(x.qtd)||0),0);
   const hnote=hn?`<p class="sub" style="margin:0">Inclui ${nf(hn)} unidades retiradas antes do app (histórico mensal da planilha, só dos lotes válidos importados).</p>`:"";
-  return instalarCard() + painelConf() + mobQuick() + kpis(ativas.length,un,prods,av.length,vc.length,ativas.reduce((s,r)=>s+kgOf(r),0)) + `
+  return instalarCard() + painelConf() + painelWA() + mobQuick() + kpis(ativas.length,un,prods,av.length,vc.length,ativas.reduce((s,r)=>s+kgOf(r),0)) + `
   <div class="grid2">
     <div class="panel">
       <h2>Retiradas por mês <small>unidades retiradas para análise e envios, últimos 12 meses</small></h2>
@@ -1550,6 +1557,12 @@ function dataCadastros(){
   ${S.mode==="db"&&FULL()?`<div class="panel"><h2>Confirmação de movimentações <small>quem confere os lançamentos</small></h2>
     <p class="sub" style="margin:0">Lançamentos que precisam de confirmação ficam “Aguardando confirmação” e só mexem no saldo depois que alguém com <b>acesso total</b> confirma. Quem lançou não confirma o próprio lançamento (a proprietária pode). Ajustes e reclassificações, feitos só por acesso total, entram confirmados.</p>
     <div class="toolbar"><div class="field grow"><label for="cfgconf">Exigir confirmação em</label><select id="cfgconf"${ro?" disabled":""}>${Object.entries(CONF_LABEL).map(([v,l])=>`<option value="${v}"${(S.cfg.confirmacao||"todos")===v?" selected":""}>${l}</option>`).join("")}</select></div><button class="btn" data-act="saveconf"${ro?" disabled":""}>Salvar</button></div></div>`:""}
+  ${(()=>{ const c=waCfg(); const f=(id,l,v,extra)=>`<div class="field" style="flex:1 1 170px"><label for="${id}">${l}</label><input id="${id}" inputmode="decimal" value="${esc(String(v).replace(".",","))}"${ro?" disabled":""}${extra||""}></div>`;
+    return `<div class="panel"><h2>Avisos pelo WhatsApp <small>o que entra na mensagem de alertas</small></h2>
+    <p class="sub" style="margin:0">Use o botão <b>Enviar pelo WhatsApp</b> no Painel. O app monta a mensagem e abre o WhatsApp para enviar ao grupo ou contato escolhido. O prazo de vencimento é o do quadro <b>Alerta de vencimento</b>.</p>
+    <div class="toolbar">${f("wa_minun","Estoque baixo: saldo até (un)",c.minUn)}${f("wa_minkg","ou peso até (kg) · 0 = não usar",c.minKg)}${f("wa_pend","Confirmação pendente há (dias)",c.pendDias)}${f("wa_frac","Fracionamento sem frascos há (dias)",c.fracDias)}${f("wa_rec","Recusas dos últimos (dias)",c.recDias)}</div>
+    <div class="toolbar"><div class="field grow"><label for="wa_cfgfone">Número padrão <span class="thu">opcional</span></label><input id="wa_cfgfone" type="tel" placeholder="Em branco: escolher o grupo ou contato na hora" value="${esc(c.fone||"")}"${ro?" disabled":""}></div>
+    <button class="btn" data-act="savewa"${ro?" disabled":""}>Salvar</button><button type="button" class="btn wa-btn" data-act="wa">Testar mensagem</button></div></div>`; })()}
   <div class="panel"><h2>Alerta de vencimento</h2>
     <div class="toolbar"><div class="field" style="flex:0 1 220px"><label for="cfgal">Avisar com quantos dias de antecedência</label><input id="cfgal" type="number" min="1" max="730" value="${esc(S.cfg.alerta)}"${ro?" disabled":""}></div>
     <button class="btn" data-act="savealerta"${ro?" disabled":""}>Salvar</button></div>
@@ -1614,6 +1627,10 @@ $("#main").addEventListener("click", async e=>{
   else if(act==="hist") historico(id);
   else if(act==="ajustar") ajustarLote(id);
   else if(act==="novocli") formCliente();
+  else if(act==="wa") formWA();
+  else if(act==="savewa"){ const g=(k,min,def)=>{ const v=String($("#"+k).value).replace(",","."); const n=parseFloat(v); return isNaN(n)?def:Math.max(min,n); };
+    const wa={minUn:g("wa_minun",0,1),minKg:g("wa_minkg",0,0),pendDias:Math.round(g("wa_pend",0,2)),fracDias:Math.round(g("wa_frac",0,7)),recDias:Math.round(g("wa_rec",0,7)),fone:$("#wa_cfgfone").value.trim()};
+    await guard(()=>store.saveCfg({...S.cfg,wa}),"Avisos salvos"); refresh(true); }
   else if(act==="cliedit"){ const c=S.clientes.find(x=>x.id===id); if(c) formCliente(c); }
   else if(act==="cli") clienteDetalhe(id);
   else if(act==="enviarcli") formMov(null,"saida",id);
@@ -2175,6 +2192,63 @@ async function doImport(){
   const p=$("#impprev"); if(p) p.innerHTML=`<p style="margin:0"><b>${n}</b> lote${n===1?"":"s"} importado${n===1?"":"s"}.</p>`;
   const f=$("#impfile"); if(f) f.value="";
   toast(`${n} lotes importados`);
+}
+
+/* ======================= Avisos pelo WhatsApp ======================= */
+/* Sem servidor: o app monta a mensagem e abre o WhatsApp com o texto pronto; a pessoa escolhe o grupo ou contato e envia. */
+const WA_DEF={minUn:1,minKg:0,pendDias:2,fracDias:7,recDias:7,fone:""};
+const waCfg=()=>({...WA_DEF,...(S.cfg.wa||{})});
+const diasDesde=v=>{ if(!v) return 0; const t=new Date(String(v).length<=10?v+"T12:00:00":v).getTime(); return isNaN(t)?0:Math.floor((Date.now()-t)/864e5); };
+function alertasDia(){
+  const c=waCfg(); const ativas=rows().filter(r=>r.saldo>0&&!r.descartada); const ordV=(a,b)=>String(a.validade).localeCompare(String(b.validade));
+  return {c,
+    baixo:ativas.filter(r=>r.st!=="vencida"&&((c.minUn>0&&r.saldo<=c.minUn)||(c.minKg>0&&kgOf(r)>0&&kgOf(r)<=c.minKg))).sort((a,b)=>a.produto.localeCompare(b.produto,"pt")||String(a.lote).localeCompare(String(b.lote))),
+    vencer:ativas.filter(r=>r.st==="avencer").sort(ordV),
+    vencidas:ativas.filter(r=>r.st==="vencida").sort(ordV),
+    pend:S.movs.filter(m=>m.status==="pendente"&&diasDesde(m.criadoEm||m.data)>=c.pendDias).sort((a,b)=>String(a.data).localeCompare(String(b.data))),
+    frac:fracAbertos().filter(m=>diasDesde(m.data)>=c.fracDias),
+    rec:S.movs.filter(m=>m.status==="recusada"&&m.recusadoEm&&diasDesde(m.recusadoEm)<=c.recDias).sort((a,b)=>String(b.recusadoEm).localeCompare(String(a.recusadoEm))) };
+}
+const WA_SECS=[
+  ["baixo","⚠️",c=>`Estoque baixo (saldo até ${nf(c.minUn)} un${c.minKg?` ou ${fkg(c.minKg)} kg`:""})`,r=>`${r.produto} · lote ${r.lote} · ${nf(r.saldo)} ${r.unidade||"un"}${kgOf(r)?` · ${fkg(kgOf(r))} kg`:""} · ${r.local||"sem local"}`],
+  ["vencer","⏰",c=>`Vencem em até ${S.cfg.alerta||60} dias`,r=>`${r.produto} · lote ${r.lote} · vence ${fmtD(r.validade)} (${r.dias===0?"hoje":r.dias+" d"}) · ${nf(r.saldo)} ${r.unidade||"un"}`],
+  ["vencidas","❌",c=>"Vencidas com saldo · separar para descarte",r=>`${r.produto} · lote ${r.lote} · venceu ${fmtD(r.validade)} · ${nf(r.saldo)} ${r.unidade||"un"} · ${r.local||"sem local"}`],
+  ["pend","⏳",c=>`Aguardando confirmação há ${c.pendDias} dia${c.pendDias===1?"":"s"} ou mais`,m=>`${fmtD(m.data)} · ${MV_LABEL[m.tipo]||m.tipo} · ${m.produto} · lote ${m.lote} · ${nf(Math.abs(Number(m.qtd)||0))} un · por ${m.porNome||m.responsavel||"?"}`],
+  ["frac","🧪",c=>`Fracionamentos aguardando os frascos há ${c.fracDias} dias ou mais`,m=>`${fmtD(m.data)} · ${m.produto} · lote ${m.lote} · ${m.ids||""}${m.kg?` · ${fkg(Number(m.kg))} kg`:""}`],
+  ["rec","🚫",c=>`Lançamentos recusados nos últimos ${c.recDias} dias`,m=>`${fmtD(m.data)} · ${MV_LABEL[m.tipo]||m.tipo} · ${m.produto} · lote ${m.lote} · ${m.porNome||m.responsavel||""}${m.recusaMotivo?` · motivo: ${m.recusaMotivo}`:""}`]];
+function msgWA(A,sel){
+  const lim=15; const partes=[`*Amostras PA · Alertas de ${fmtD(hoje())}*`];
+  let n=0;
+  for(const [k,ic,tit,lin] of WA_SECS){ const L=A[k]; if(!sel[k]||!L.length) continue; n++;
+    partes.push(`${ic} *${tit(A.c)}* (${L.length})\n`+L.slice(0,lim).map(x=>"• "+lin(x)).join("\n")+(L.length>lim?`\n• … e mais ${L.length-lim}`:"")); }
+  if(!n) partes.push("✅ Nenhum alerta para os itens escolhidos.");
+  partes.push(`Ver no app: ${location.origin}${location.pathname}`);
+  return partes.join("\n\n");
+}
+const foneWA=t=>{ let d=String(t||"").replace(/\D/g,""); if(d.length===10||d.length===11) d="55"+d; return d; };
+function painelWA(){
+  if(!S.amostras.length) return ""; const A=alertasDia(); const it=WA_SECS.map(([k,ic,tit])=>[k,ic,A[k].length]).filter(x=>x[2]);
+  const NOME={baixo:"estoque baixo",vencer:"a vencer",vencidas:"vencidas",pend:"aguardando confirmação",frac:"fracionamentos abertos",rec:"recusados"};
+  return `<div class="panel wa-card"><div style="font-weight:800">📲 Avisos do dia</div><div class="wa-ch">${it.length?it.map(([k,ic,n])=>`<span class="chip">${ic} ${n} ${NOME[k]}</span>`).join(""):`<span class="sub">Nenhum alerta hoje.</span>`}</div>
+    <button type="button" class="btn wa-btn" data-act="wa">Enviar pelo WhatsApp</button></div>`;
+}
+function formWA(){
+  const A=alertasDia(); const cnt=k=>A[k].length;
+  const body=`<p class="sub full" style="margin:0">O app monta a mensagem com os alertas de hoje. Ao tocar em <b>Abrir WhatsApp</b>, escolha o grupo ou o contato e envie. Dá para editar o texto antes.</p>
+    <div class="full"><div class="sub" style="margin-bottom:6px">O que entra na mensagem</div><div class="lchkbox" style="max-height:none">${WA_SECS.map(([k,ic,tit])=>`<label class="lchk"><input type="checkbox" class="wak" value="${k}"${cnt(k)?" checked":""}><span style="flex:1">${ic} ${esc(tit(A.c))}</span><b style="font-family:var(--mono)">${cnt(k)}</b></label>`).join("")}</div></div>
+    <div class="field full"><label for="wa_txt">Mensagem</label><textarea id="wa_txt" spellcheck="false"></textarea><div class="sub" id="wa_len" style="margin-top:4px"></div></div>
+    <div class="field full"><label for="wa_fone">Enviar para <span class="thu">opcional</span></label><input id="wa_fone" type="tel" inputmode="tel" placeholder="Em branco: você escolhe o grupo ou contato no WhatsApp" value="${esc(LS.get("waFone",A.c.fone||""))}"><div class="sub" style="margin-top:4px">Para um número fixo, use DDD + número (ex.: 85 99999-0000). Grupos são escolhidos no próprio WhatsApp.</div></div>
+    <div class="formerr full" id="wa_err"></div>`;
+  const m=modal("Enviar alertas pelo WhatsApp",body,`<button type="button" class="btn" data-close>Fechar</button><button type="button" class="btn" id="wa_copy">Copiar texto</button><button type="submit" class="btn wa-btn">Abrir WhatsApp</button>`,true);
+  const q=x=>m.ov.querySelector(x); const ta=q("#wa_txt");
+  const sel=()=>Object.fromEntries([...m.ov.querySelectorAll(".wak")].map(c=>[c.value,c.checked]));
+  const len=()=>{ const n=ta.value.length; q("#wa_len").textContent=`${nf(n)} caracteres${n>3500?" · mensagem longa: se o WhatsApp abrir sem o texto, use Copiar texto e cole na conversa":""}`; };
+  const gen=()=>{ ta.value=msgWA(A,sel()); len(); };
+  m.ov.querySelectorAll(".wak").forEach(c=>c.addEventListener("change",gen)); ta.addEventListener("input",len); gen();
+  q("#wa_copy").onclick=async()=>{ try{ await navigator.clipboard.writeText(ta.value); }catch(e){ ta.select(); document.execCommand("copy"); } toast("Texto copiado. Cole na conversa do WhatsApp."); };
+  m.form.onsubmit=e=>{ e.preventDefault(); const f=foneWA(q("#wa_fone").value); if(q("#wa_fone").value.trim()&&f.length<12){ q("#wa_err").textContent="Número incompleto. Use DDD + número, ou deixe em branco para escolher no WhatsApp."; return; }
+    LS.set("waFone",q("#wa_fone").value.trim()); const url=`https://wa.me/${f}?text=${encodeURIComponent(ta.value)}`;
+    const w=window.open(url,"_blank"); if(w){ try{ w.opener=null; }catch(e){} } else location.href=url; };
 }
 
 /* ======================= Exportar ======================= */
