@@ -340,6 +340,17 @@ td>.rowacts{min-width:172px}
 .etq .eq{width:27mm;height:27mm;flex:none}.etq .eq svg{width:100%;height:100%;display:block}
 .etq .ef{display:flex;align-items:flex-end;justify-content:space-between;gap:3mm}.etq .ew{font-size:6mm;line-height:1.1}.etq .emp{font-size:3.2mm;margin-top:1mm}
 .etq .ei{font-size:11.5mm;line-height:1;text-align:right;white-space:nowrap}.etq .eemb{font-size:3.3mm;line-height:1.3;text-align:right}
+.etq.etq6{padding:0;display:grid;grid-template-columns:75mm 75mm;grid-template-rows:repeat(3,33.33mm)}
+.etqp{width:75mm;height:33.33mm;box-sizing:border-box;padding:.9mm;background:#fff;color:#000;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.etqp *{box-sizing:border-box}.etqp .pb{height:100%;border:.3mm solid #000;padding:.6mm 1.4mm .7mm;display:flex;flex-direction:column}
+.etqp .pe{font-weight:700;font-size:3.5mm;line-height:1.05;text-align:center;white-space:nowrap}
+.etqp .pa{font-size:1.72mm;line-height:1.2;text-align:center;white-space:nowrap;letter-spacing:-.01mm}
+.etqp .pp,.etqp .pl{font-size:2.85mm;line-height:1.15;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etqp .pf{display:flex;gap:1.2mm;align-items:flex-end;flex:1;min-height:0;margin-top:.3mm}
+.etqp .pd{flex:1;min-width:0;line-height:1.28}.etqp .ps{font-size:2.05mm;white-space:nowrap}.etqp .pt{font-size:2.15mm;line-height:1.15}.etqp .pm{font-size:1.72mm;white-space:nowrap;margin-top:.4mm}
+.etqp .pr{text-align:right;white-space:nowrap;line-height:1.02;padding-bottom:.2mm}.etqp .pi{font-size:4.3mm}.etqp .pw{font-size:4.3mm;margin-top:1mm}
+.etqp .pq{width:14mm;height:14mm;flex:none}.etqp .pq svg{width:100%;height:100%;display:block}
+.etqprev .etqp{transform-origin:top left;box-shadow:0 4px 18px rgba(0,0,0,.18)}
 .etqprev{background:var(--sunk);border-radius:12px;padding:12px;overflow:hidden}.etqprev .etq{transform-origin:top left;box-shadow:0 4px 18px rgba(0,0,0,.18);border-radius:2mm}
 #printArea{display:none}
 @media print{body>*:not(#printArea){display:none!important}#printArea{display:block!important}html,body{background:#fff!important;margin:0!important;padding:0!important}
@@ -2254,6 +2265,29 @@ function etqHTML(r,key){
       <div>${e?`<div class="eemb">${esc(e)}</div>`:""}<div class="ei">ID: ${esc(baseId(key,e))}</div></div></div>
   </div></div>`;
 }
+/* Frascos: etiqueta pequena (75 × 33 mm), 6 por etiqueta de 15 × 10 cm, como o modelo atual */
+const ehFrasco=(r,k)=>/frasco/i.test((idsOf(r).emb||{})[k]||"");
+function etqPeqHTML(r,key){
+  const io=idsOf(r), C=etqCfg(); const e=io.emb[key]||""; const un=(io.q&&io.q[key])||1; const kgU=(Number(io.kg[key])||0)/un;
+  const P=PRODS().find(p=>norm(p.nome)===norm(r.produto))||{}; const mapa=r.mapa||P.mapa||"";
+  const temp=armProd(r.produto)==="ambiente"?C.tempAmb:C.tempCong; const lote=String(r.lote||"").replace(/\s*-\s*/g," - ");
+  return `<div class="etqp"><div class="pb">
+    <div class="pe">${esc(C.empresa)}</div><div class="pa">${esc(C.endereco)}</div>
+    <div class="pp">${esc(r.produto)}</div><div class="pl">Lote: ${esc(lote)}</div>
+    <div class="pf"><div class="pd"><div class="ps">Data de Fabricação: ${fmtD(r.fabricacao)}</div><div class="ps">Data de Validade: ${fmtD(r.validade)}</div><div class="pt">Temperatura de Armazenamento: <span style="white-space:nowrap">${esc(temp)}</span></div>${mapa?`<div class="pm">MAPA Registration: ${esc(mapa)}</div>`:""}</div>
+      <div class="pr"><div class="pi">ID: ${esc(baseId(key,e))}</div><div class="pw">Peso: ${kgU?String(Math.round(kgU*1000))+" g":"____ g"}</div></div>
+      <div class="pq">${window.qrcode?qrSvg(qrUrl(r.id,key)):""}</div></div>
+  </div></div>`;
+}
+const etqPrevHTML=(r,k)=>ehFrasco(r,k)?etqPeqHTML(r,k):etqHTML(r,k);
+/* itens [{r,k,n}] → páginas: saco = 1 por página; frasco = 6 por página */
+function paginasEtq(items){
+  const pg=[], peq=[];
+  items.forEach(x=>{ for(let i=0;i<x.n;i++){ if(ehFrasco(x.r,x.k)) peq.push(etqPeqHTML(x.r,x.k)); else pg.push(etqHTML(x.r,x.k)); } });
+  for(let i=0;i<peq.length;i+=6){ const g=peq.slice(i,i+6); while(g.length<6) g.push('<div class="etqp"></div>'); pg.push(`<div class="etq etq6">${g.join("")}</div>`); }
+  return {pages:pg,peq:peq.length};
+}
+const escalaPrev=(box,max)=>{ const el=box.firstElementChild; if(!el) return; const w=box.clientWidth-24; const sc=Math.min(max,w/el.offsetWidth); el.style.transform=`scale(${sc})`; box.style.height=(el.offsetHeight*sc+24)+"px"; };
 async function esperaLote(id){ for(let i=0;i<30&&!rows().find(x=>x.id===id);i++) await new Promise(o=>setTimeout(o,100)); return rows().find(x=>x.id===id); }
 async function formEtiquetas(id,pre){
   const r=await esperaLote(id); if(!r){ toast("Lote não encontrado."); return; }
@@ -2265,18 +2299,18 @@ async function formEtiquetas(id,pre){
       ${io.ids.map(k=>{ const un=(io.q&&io.q[k])||1; const on=preset?preset.has(k):true; return `<label class="lchk"><input type="checkbox" class="etk" value="${esc(k)}"${on?" checked":""}><span style="flex:1;font-family:var(--mono)">${esc(idLabel(k,io.q,io.kg,io.emb))}</span><input type="number" class="etn" data-k="${esc(k)}" min="1" max="99" value="${un}" aria-label="Cópias de ${esc(k)}" style="width:64px;min-height:34px;text-align:right"></label>`; }).join("")}
     </div></div>
     <div class="field full"><label for="et_ori">Formato da impressora</label><select id="et_ori"><option value="pais"${orient==="pais"?" selected":""}>15 × 10 cm deitada (como a etiqueta atual)</option><option value="ret"${orient==="ret"?" selected":""}>10 × 15 cm em pé (o app gira a etiqueta)</option></select>
-      <div class="sub" style="margin-top:4px">Na janela de impressão: escolha a impressora de etiquetas, tamanho do papel 100 × 150 mm, margens “Nenhuma” e escala 100%.</div></div>
+      <div class="sub" style="margin-top:4px">Frascos saem no modelo pequeno, 6 por etiqueta de 15 × 10 cm, para recortar. Na janela de impressão: escolha a impressora de etiquetas, tamanho do papel 100 × 150 mm, margens “Nenhuma” e escala 100%.</div></div>
     <div class="full"><div class="sub" style="margin-bottom:6px">Prévia</div><div class="etqprev" id="et_prev"></div></div>`;
   const m=modal("Imprimir etiquetas",body,`<button type="button" class="btn" data-close>Fechar</button><button type="submit" class="btn primary" id="et_go">Imprimir</button>`,true);
   const q=x=>m.ov.querySelector(x);
   const lista=()=>[...m.ov.querySelectorAll(".etk")].filter(c=>c.checked).map(c=>({k:c.value,n:Math.max(1,Math.min(99,parseInt(m.ov.querySelector(`.etn[data-k="${CSS.escape(c.value)}"]`).value)||1))}));
   const prev=()=>{ const L=lista(); const box=q("#et_prev"); const tot=L.reduce((s,x)=>s+x.n,0); q("#et_go").textContent=tot?`Imprimir ${tot} etiqueta${tot===1?"":"s"}`:"Imprimir"; q("#et_go").disabled=!tot;
     if(!L.length){ box.innerHTML=`<span class="sub">Marque pelo menos um ID.</span>`; box.style.height=""; return; }
-    box.innerHTML=etqHTML(r,L[0].k); const el=box.querySelector(".etq"); const w=box.clientWidth-24; const sc=Math.min(1.3,w/el.offsetWidth); el.style.transform=`scale(${sc})`; box.style.height=(el.offsetHeight*sc+24)+"px"; };
+    box.innerHTML=etqPrevHTML(r,L[0].k); escalaPrev(box,ehFrasco(r,L[0].k)?2:1.3); };
   m.ov.addEventListener("change",prev); m.ov.addEventListener("input",ev=>{ if(ev.target.classList.contains("etn")) prev(); });
   setTimeout(prev,30); window.addEventListener("resize",prev,{once:true});
   m.form.onsubmit=e=>{ e.preventDefault(); const L=lista(); if(!L.length) return; const ori=q("#et_ori").value; LS.set("etqOri",ori);
-    const pages=[]; L.forEach(x=>{ const h=etqHTML(r,x.k); for(let i=0;i<x.n;i++) pages.push(h); });
+    const {pages}=paginasEtq(L.map(x=>({r,k:x.k,n:x.n})));
     const imp=etqImpressas(); imp.add(r.id); LS.set("etqPrint",JSON.stringify([...imp].slice(-2000)));
     m.close(); imprimirEtq(pages,ori); };
 }
@@ -2295,7 +2329,7 @@ async function formEtqLote(){
     <div class="full"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span class="sub" id="el_sum" style="flex:1;min-width:200px"></span><button type="button" class="btn sm" id="el_all">Marcar todos</button><button type="button" class="btn sm" id="el_new">Só as não impressas</button><button type="button" class="btn sm" id="el_none">Limpar</button></div>
       <div class="lchkbox" id="el_list" style="max-height:300px;overflow:auto"></div></div>
     <div class="field full"><label for="el_ori">Formato da impressora</label><select id="el_ori"><option value="pais"${ori0==="pais"?" selected":""}>15 × 10 cm deitada (como a etiqueta atual)</option><option value="ret"${ori0==="ret"?" selected":""}>10 × 15 cm em pé (o app gira a etiqueta)</option></select>
-      <div class="sub" style="margin-top:4px">Uma etiqueta por volume de cada ID. Na janela de impressão: impressora de etiquetas, papel 100 × 150 mm, margens “Nenhuma” e escala 100%.</div></div>
+      <div class="sub" style="margin-top:4px">Uma etiqueta por volume de cada ID. Frascos saem no modelo pequeno, 6 por etiqueta de 15 × 10 cm, para recortar. Na janela de impressão: impressora de etiquetas, papel 100 × 150 mm, margens “Nenhuma” e escala 100%.</div></div>
     <div class="full"><div class="sub" style="margin-bottom:6px">Prévia da primeira etiqueta</div><div class="etqprev" id="el_prev"></div></div>`;
   const m=modal("Imprimir etiquetas",body,`<button type="button" class="btn" data-close>Fechar</button><button type="submit" class="btn primary" id="el_go">Imprimir</button>`,true);
   const q=x=>m.ov.querySelector(x); const SEL=new Set(); let primeira=true;
@@ -2313,7 +2347,7 @@ async function formEtqLote(){
     q("#el_go").textContent=tot?`Imprimir ${tot} etiqueta${tot===1?"":"s"}`:"Imprimir"; q("#el_go").disabled=!tot;
     const box=q("#el_prev"); const r0=sel[0];
     if(!r0){ box.innerHTML=`<span class="sub">Marque pelo menos um lote.</span>`; box.style.height=""; return; }
-    box.innerHTML=etqHTML(r0,idsOf(r0).ids[0]); const el=box.querySelector(".etq"); const w=box.clientWidth-24; const sc=Math.min(1.1,w/el.offsetWidth); el.style.transform=`scale(${sc})`; box.style.height=(el.offsetHeight*sc+24)+"px"; };
+    const k0=idsOf(r0).ids[0]; box.innerHTML=etqPrevHTML(r0,k0); escalaPrev(box,ehFrasco(r0,k0)?2:1.1); };
   m.ov.addEventListener("change",ev=>{ const c=ev.target.closest(".elk"); if(c){ if(c.checked) SEL.add(c.value); else SEL.delete(c.value); } draw(); });
   q("#el_q").addEventListener("input",draw);
   q("#el_all").onclick=()=>{ lista().forEach(r=>SEL.add(r.id)); draw(); };
@@ -2321,7 +2355,7 @@ async function formEtqLote(){
   q("#el_none").onclick=()=>{ SEL.clear(); draw(); };
   setTimeout(draw,30);
   m.form.onsubmit=e=>{ e.preventDefault(); const sel=lista().filter(r=>SEL.has(r.id)); if(!sel.length) return; const ori=q("#el_ori").value; LS.set("etqOri",ori);
-    const pages=[]; sel.forEach(r=>{ const io=idsOf(r); io.ids.forEach(k=>{ const h=etqHTML(r,k); for(let i=0;i<((io.q&&io.q[k])||1);i++) pages.push(h); }); });
+    const items=[]; sel.forEach(r=>{ const io=idsOf(r); io.ids.forEach(k=>items.push({r,k,n:(io.q&&io.q[k])||1})); }); const {pages}=paginasEtq(items);
     const imp=etqImpressas(); sel.forEach(r=>imp.add(r.id)); LS.set("etqPrint",JSON.stringify([...imp].slice(-2000)));
     m.close(); imprimirEtq(pages,ori); };
 }
